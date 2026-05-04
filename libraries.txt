@@ -1,9 +1,13 @@
-# CARDUINO v4 - pinned library versions
+# CARDUINO v4 — pinned library versions
 # Update this file whenever bumping a dependency.
+#
+# Libraries are installed in the user Arduino sketchbook
+# (default: ~/Documents/Arduino/libraries/, OneDrive-redirected on this machine).
+# `arduino-cli lib install <name>` from anywhere installs to the sketchbook.
 
-arduino:renesas_uno @ 1.5.3
-ArduinoBLE @ 2.0.1
-Arduino_LED_Matrix @ 1.1.0
-mcp2515 (autowp) @ 49e0d7d
-OTAUpdate @ bundled with renesas_uno
-WiFiS3 @ bundled with renesas_uno
+arduino:renesas_uno        @ 1.5.3
+ArduinoBLE                 @ 2.0.1
+Arduino_LED_Matrix         @ bundled with renesas_uno (no separate install)
+autowp/arduino-mcp2515     @ 1.3.1   (installed from https://github.com/autowp/arduino-mcp2515.git)
+OTAUpdate                  @ bundled with renesas_uno
+WiFiS3                     @ bundled with renesas_uno

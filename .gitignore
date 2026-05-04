@@ -16,3 +16,7 @@ Thumbs.db
 .idea/
 *.swp
 *~
+
+# Project-local arduino-cli config (we use the user sketchbook globally)
+arduino-cli.local.yaml
+.arduino/
