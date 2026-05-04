@@ -52,6 +52,10 @@ def main() -> None:
     ap.add_argument("--bitrate", default=500000, type=int, help="CAN bitrate (default: 500000)")
     ap.add_argument("--summary-window", default=5.0, type=float,
                     help="seconds between rate summary lines")
+    ap.add_argument("--changes-only", action="store_true",
+                    help="suppress per-frame output; only print when Frame 2 "
+                         "health bitmask or age changes (plus periodic summary). "
+                         "Useful for bench-testing health transitions.")
     args = ap.parse_args()
 
     print(f"Connecting to {args.port} @ {args.bitrate // 1000} kbps via slcan...")
@@ -63,6 +67,8 @@ def main() -> None:
     last_seq: int | None = None
     seq_anomalies = 0
     no_frame_warned = False
+    last_health: int | None = None
+    last_age: int | None = None
 
     try:
         while True:
@@ -83,7 +89,7 @@ def main() -> None:
             if msg.arbitration_id == FRAME1_ID:
                 if len(msg.data) != 8:
                     print(f"  {id_hex}  {data_hex}  !! malformed (DLC={len(msg.data)}, expected 8)")
-                else:
+                elif not args.changes_only:
                     print(f"  {id_hex}  {data_hex}  {decode_frame1(msg.data)}")
             elif msg.arbitration_id == FRAME2_ID:
                 if len(msg.data) != 8:
@@ -96,8 +102,20 @@ def main() -> None:
                             seq_anomalies += 1
                             print(f"  !! SEQ skip: expected {expected}, got {seq}")
                     last_seq = seq
-                    print(f"  {id_hex}  {data_hex}  {decode_frame2(msg.data)}")
-            else:
+                    health = msg.data[5]
+                    age = msg.data[7]
+                    if args.changes_only:
+                        if health != last_health or age != last_age:
+                            ts = time.strftime("%H:%M:%S")
+                            h_from = f"0x{last_health:02X}" if last_health is not None else "init"
+                            a_from = f"{last_age}" if last_age is not None else "init"
+                            print(f"  [{ts}] CHANGE  health: {h_from}->0x{health:02X}  "
+                                  f"age: {a_from}->{age}  (Frame 2 = {data_hex})")
+                            last_health = health
+                            last_age = age
+                    else:
+                        print(f"  {id_hex}  {data_hex}  {decode_frame2(msg.data)}")
+            elif not args.changes_only:
                 print(f"  {id_hex}  {data_hex}  (unknown)")
 
             now = time.time()
