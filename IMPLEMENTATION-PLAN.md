@@ -1368,6 +1368,11 @@ git commit -m "feat: CanSendPhase broadcasts Frames 1 and 2 at 10 Hz"
 
 ### Task 14: Boot self-test orchestration
 
+> **⚠ Audit findings for this task (apply during implementation):**
+> - **HIGH** — After Step 3, add gating so the main loop SKIPS `CanSendPhase()` when CAN init failed. Without this, `CanSendPhase()` fires every 100ms against a controller that may not be in normal mode, wasting SPI cycles and producing retry storms. Wrap the call in the .ino loop with `if (self_test_can_available()) { CanSendPhase(); }` (or equivalent gating inside `CanSendPhase` itself).
+> - **MEDIUM** — `self_tests.cpp` uses `<Arduino.h>` and `Serial`. Wrap the entire body (everything below `#include "self_tests.h"`) in `#ifdef ARDUINO ... #endif` per project convention, so the file compiles cleanly under host g++. The header (`self_tests.h`) is platform-agnostic and doesn't need the guard.
+> - **DEFERRED-TO-TASK-18** — `mcp2515.sendMessage()` return values are currently ignored in `CanSendPhase`. Track tx errors and surface into a CAN health/error counter as part of the health bitmask Phase D introduces.
+
 **Files:**
 - Create: `carduino-v4/self_tests.h`
 - Create: `carduino-v4/self_tests.cpp`
@@ -1466,6 +1471,9 @@ git commit -m "feat: boot self-test orchestration"
 
 ### Task 15: Electrical fault detection + tests
 
+> **⚠ Audit findings for this task (apply during implementation):**
+> - **HIGH** — `sensor_health.h` MUST wrap function declarations in the `#ifdef __cplusplus / extern "C" { ... } / #endif` guard pattern, identical to `sensor_pipeline.h` and `can_protocol.h`. Without it, host tests declare `electrical_fault()` inside their own `extern "C"` block but the C++-mangled implementation symbol won't match → linker fails. (Same defect that bit Task 5; convention is established.)
+
 **Files:**
 - Create: `carduino-v4/sensor_health.h`
 - Create: `carduino-v4/sensor_health.cpp`
@@ -1556,6 +1564,12 @@ git commit -m "feat: electrical fault detection"
 ---
 
 ### Task 16: Debounce state machine + tests
+
+> **⚠ Audit findings for this task (apply during implementation):**
+> - **MEDIUM** — Add an explicit RED step: after writing tests but before implementing, run `bash tests/run-tests.sh` and confirm the failure is the expected linker error on the undefined function. Plan as written collapses RED+GREEN.
+> - **MEDIUM** — `HEALTH_DEBOUNCE_GOOD = 5` samples at 100Hz = 50ms clear time. DESIGN.md §7.1 calls for 100-250ms electrical clear debounce. Bump to ≥10 samples, or use fault-class-specific counters.
+> - **MEDIUM** — Add **threshold hysteresis** around the 1%/99% electrical edges per design §7.1. Without hysteresis, an ADC reading flapping right at the threshold will chatter the fault flag. Use separate assert/clear thresholds (e.g., assert below 1%, clear above 3%; assert above 99%, clear below 97%).
+
 
 **Files:**
 - Modify: `carduino-v4/sensor_health.h`
@@ -1667,6 +1681,10 @@ git commit -m "feat: debounce state machine"
 
 ### Task 17: Plausibility check + tests
 
+> **⚠ Audit findings for this task (apply during implementation):**
+> - **LOW** — Add an explicit RED step before implementation, same as Task 16.
+
+
 **Files:**
 - Modify: `carduino-v4/sensor_health.h`
 - Modify: `carduino-v4/sensor_health.cpp`
@@ -1731,6 +1749,14 @@ git commit -m "feat: plausibility checks for sensor values"
 ---
 
 ### Task 18: Per-sensor health state + integration into SensorPhase
+
+> **⚠ Audit findings for this task (apply during implementation):**
+> - **HIGH** — Electrical fault checks MUST use **raw `analogRead()` values**, not EWMA-filtered ones. The EWMA's slow alpha (0.05–0.10) delays detection by hundreds of ms and can fully mask transient electrical faults. Pass raw ADC ints into `channel_health_update()` for the electrical check; plausibility checks can use the filtered/converted engineering value.
+> - **HIGH** — `age_ticks` is being incremented every `SensorPhase()` cycle (100Hz = 10ms ticks) but Frame 2 byte 7 (`max_age`) is specified in **100ms units** per design §5. With the plan as written, max age saturates at 0xFF after only 2.55s of held value instead of the intended 25.5s. Fix: increment age at the CanSendPhase (10Hz) cadence, OR keep the 10ms tick internally and divide by 10 before packing into Frame 2 byte 7. The first is simpler.
+> - **MEDIUM** — Add focused host tests for `ChannelHealth` BEFORE integrating into `SensorPhase`. The plan currently introduces stateful per-channel logic without dedicated tests for: age increment/reset, electrical+plausibility interaction, bitmask packing. Test corner cases first, then wire in.
+> - **MEDIUM** — In Step 5 (bench verify), the expectation that **disconnected/floating inputs will fault** is unreliable. Floating high-impedance pins can land mid-rail and appear healthy/plausible (we saw this exact behavior during Task 9 bench verify). Force the fault condition explicitly: short A0 to GND or VCC, or use a known pull-down/pull-up to drive the rail.
+> - **DEFERRED-FROM-TASK-14** — Track `mcp2515.sendMessage()` return values from `CanSendPhase()`; surface into a CAN-level health bit in the bitmask. (TX failures, bus-off, retry storms.)
+
 
 **Files:**
 - Modify: `carduino-v4/sensor_health.h`
@@ -1864,6 +1890,14 @@ git commit -m "feat: per-sensor health bitmask in CAN frame"
 ---
 
 ### Task 19: Flatline detection + engine-running gate (without RPM yet)
+
+> **⚠ Audit findings for this task (apply during implementation):**
+> - **HIGH** — When the `channel_health_update()` signature changes to take flatline state, the header prototype AND all call sites must update **in the same step**. Plan as drafted introduces signature drift between Step ordering, which will fail to compile or link mid-task.
+> - **HIGH** — Flatline relative-change formula `(current - last_value) / last_value` breaks for negative `last_value` (cold temperatures). Result becomes negative, and significant *real* changes can register as below-threshold or be sign-flipped. Fix: divide by `fabsf(last_value)`, with a small absolute-change fallback when `|last_value|` is near zero (avoid div-by-tiny).
+> - **MEDIUM** — `engine_running_now()` in Step 6 is computed BEFORE the current cycle's health bitmask is updated for oil pressure, so the oil-pressure fallback uses stale health. Compute oil-pressure plausibility/electrical health for this cycle first, then evaluate the engine-running gate.
+> - **MEDIUM** — When flatline is detected, OR bit 5 ("Sensor flatline detected", per design §5 status flag layout) into Frame 2 byte 6 (`status_flags`). Currently the plan tracks flatline internally but doesn't surface it to the wire.
+> - **MEDIUM** — Test coverage gaps. Add cases for: negative-temperature flatline transitions, transition from engine-off → engine-running after a long stable period, the exact 5-second `FLATLINE_TIMEOUT_MS` boundary.
+
 
 **Files:**
 - Modify: `carduino-v4/sensor_health.h`
