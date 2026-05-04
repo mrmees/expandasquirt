@@ -1,6 +1,7 @@
 #include "config.h"
 #include "can_protocol.h"
 #include "sensor_pipeline.h"
+#include "self_tests.h"
 
 unsigned long lastSensorMs = 0;
 unsigned long lastCanMs    = 0;
@@ -17,9 +18,11 @@ void setup() {
 
     analogReadResolution(ADC_RESOLUTION_BITS);
     sensor_pipeline_init();
-    if (!can_protocol_init()) {
-        Serial.println(F("CAN init failed — entering degraded mode"));
-        // Degraded mode handling lands in Task 32; for now just continue
+
+    ErrCode boot_err = run_boot_self_tests();
+    if (boot_err == ERR_ADC) {
+        Serial.println(F("Halting on ADC failure"));
+        while (1) delay(1000);  // halt; LED matrix display lands in Task 22
     }
 
     // Phases will be initialized as they are added in subsequent tasks
@@ -44,7 +47,9 @@ void loop() {
     }
 
     if (now - lastCanMs >= CAN_PERIOD_MS) {
-        CanSendPhase();
+        if (self_test_can_available()) {
+            CanSendPhase();
+        }
         lastCanMs = now;
     }
 
