@@ -11,6 +11,9 @@ extern "C" {
 bool can_protocol_init();
 void CanSendPhase();
 
+// Pack SensorState into 8-byte CAN Frame 1 payload (big-endian per design section 5.3)
+void pack_frame1(const SensorState* s, uint8_t* out8);
+
 #ifdef __cplusplus
 }
 #endif

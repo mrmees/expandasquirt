@@ -1,6 +1,18 @@
+#include "can_protocol.h"
+
+void pack_frame1(const SensorState* s, uint8_t* out8) {
+    out8[0] = (s->oil_temp_F_x10        >> 8) & 0xFF;
+    out8[1] =  s->oil_temp_F_x10               & 0xFF;
+    out8[2] = (s->oil_pressure_psi_x10  >> 8) & 0xFF;
+    out8[3] =  s->oil_pressure_psi_x10         & 0xFF;
+    out8[4] = (s->fuel_pressure_psi_x10 >> 8) & 0xFF;
+    out8[5] =  s->fuel_pressure_psi_x10        & 0xFF;
+    out8[6] = (s->pre_sc_pressure_kpa_x10 >> 8) & 0xFF;
+    out8[7] =  s->pre_sc_pressure_kpa_x10        & 0xFF;
+}
+
 #ifdef ARDUINO
 
-#include "can_protocol.h"
 #include <SPI.h>
 #include <mcp2515.h>
 

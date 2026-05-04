@@ -11,7 +11,7 @@ TEST_CASE(harness_sanity) {
 
 // Future: include test files for each module
 #include "test_sensor_pipeline.cpp"
-// #include "test_can_protocol.cpp"
+#include "test_can_protocol.cpp"
 // #include "test_sensor_health.cpp"
 
 int main() {
