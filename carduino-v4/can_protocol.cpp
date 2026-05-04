@@ -1,0 +1,57 @@
+#ifdef ARDUINO
+
+#include "can_protocol.h"
+#include <SPI.h>
+#include <mcp2515.h>
+
+static MCP2515 mcp2515(PIN_MCP2515_CS);
+
+static bool selftest_loopback() {
+    mcp2515.setLoopbackMode();
+
+    struct can_frame tx;
+    tx.can_id  = 0x123;
+    tx.can_dlc = 4;
+    tx.data[0] = 0xDE; tx.data[1] = 0xAD;
+    tx.data[2] = 0xBE; tx.data[3] = 0xEF;
+    if (mcp2515.sendMessage(&tx) != MCP2515::ERROR_OK) return false;
+
+    delay(5);
+
+    struct can_frame rx;
+    if (mcp2515.readMessage(&rx) != MCP2515::ERROR_OK) return false;
+    if (rx.can_id  != 0x123) return false;
+    if (rx.can_dlc != 4)     return false;
+    if (rx.data[0] != 0xDE || rx.data[1] != 0xAD) return false;
+    if (rx.data[2] != 0xBE || rx.data[3] != 0xEF) return false;
+
+    return true;
+}
+
+bool can_protocol_init() {
+    SPI.begin();
+    if (mcp2515.reset() != MCP2515::ERROR_OK) {
+        Serial.println(F("MCP2515 reset failed"));
+        return false;
+    }
+    if (mcp2515.setBitrate(CAN_BITRATE, CAN_CRYSTAL) != MCP2515::ERROR_OK) {
+        Serial.println(F("MCP2515 setBitrate failed"));
+        return false;
+    }
+    if (!selftest_loopback()) {
+        Serial.println(F("MCP2515 loopback self-test failed"));
+        return false;
+    }
+    if (mcp2515.setNormalMode() != MCP2515::ERROR_OK) {
+        Serial.println(F("MCP2515 setNormalMode failed"));
+        return false;
+    }
+    Serial.println(F("MCP2515 init OK"));
+    return true;
+}
+
+void CanSendPhase() {
+    // populated in Tasks 11-13
+}
+
+#endif

@@ -1,4 +1,5 @@
 #include "config.h"
+#include "can_protocol.h"
 #include "sensor_pipeline.h"
 
 unsigned long lastSensorMs = 0;
@@ -16,6 +17,10 @@ void setup() {
 
     analogReadResolution(ADC_RESOLUTION_BITS);
     sensor_pipeline_init();
+    if (!can_protocol_init()) {
+        Serial.println(F("CAN init failed — entering degraded mode"));
+        // Degraded mode handling lands in Task 32; for now just continue
+    }
 
     // Phases will be initialized as they are added in subsequent tasks
 }
