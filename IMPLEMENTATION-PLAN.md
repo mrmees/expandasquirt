@@ -511,12 +511,16 @@ TEST_CASE(thermistor_at_25C_returns_77F) {
 }
 
 TEST_CASE(thermistor_at_extremes) {
-    // Near full-scale ADC (very low resistance) → very hot
-    float hot = thermistor_to_F(15000, 10000.0f, 10000.0f, 3950.0f);
+    // Pull-up topology (per sensor_pipeline.h): pull-up between V+ and ADC,
+    // thermistor between ADC and GND. So high ADC = high thermistor R = cold,
+    // low ADC = low thermistor R = hot.
+
+    // Near zero ADC → very low thermistor resistance → very hot
+    float hot = thermistor_to_F(500, 10000.0f, 10000.0f, 3950.0f);
     ASSERT_TRUE(hot > 200.0f);
 
-    // Near zero ADC (very high resistance) → very cold
-    float cold = thermistor_to_F(500, 10000.0f, 10000.0f, 3950.0f);
+    // Near full-scale ADC → very high thermistor resistance → very cold
+    float cold = thermistor_to_F(15000, 10000.0f, 10000.0f, 3950.0f);
     ASSERT_TRUE(cold < 0.0f);
 }
 ```
@@ -548,6 +552,10 @@ Expected: linker error — `thermistor_to_F` undefined.
 
 #include "config.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Convert raw ADC reading from a thermistor voltage divider to °F.
 // Uses single-B-parameter Steinhart-Hart equation.
 // Topology: pull-up resistor (pullup_ohms) between V+ and ADC pin,
@@ -562,8 +570,20 @@ float pressure_psi(int adc_raw, float psi_at_full_scale);
 // to kPa absolute. Uses BOSCH_SLOPE / BOSCH_OFFSET from config.h.
 float bosch_kpa(int adc_raw);
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 ```
+
+**Convention note:** every module header declaring functions called from
+the host-side test harness uses the `extern "C"` guard pattern shown above.
+The test files `extern "C"` their own redeclarations (so they don't depend
+on the header), and the production header guards make sure
+the matching definition in the `.cpp` has C linkage so symbols line up
+at link time. Apply this same idiom to `can_protocol.h`, `sensor_health.h`,
+etc. as they're added.
 
 - [ ] **Step 5: Create `carduino-v4/sensor_pipeline.cpp` with thermistor function**
 
