@@ -44,7 +44,7 @@ void loop() {
     }
 
     if (now - lastCanMs >= CAN_PERIOD_MS) {
-        // CanSendPhase() — Task 13
+        CanSendPhase();
         lastCanMs = now;
     }
 

@@ -74,7 +74,27 @@ bool can_protocol_init() {
 }
 
 void CanSendPhase() {
-    // populated in Tasks 11-13
+    static uint8_t seq = 0;
+    gSensorState.sequence_counter = seq++;
+
+    uint8_t buf[8];
+
+    // Frame 1
+    pack_frame1(&gSensorState, buf);
+    struct can_frame f1;
+    f1.can_id  = CAN_TX_FRAME1_ID;
+    f1.can_dlc = 8;
+    memcpy(f1.data, buf, 8);
+    mcp2515.sendMessage(&f1);
+
+    // Frame 2 — for now, status flags = ready bit only, max_age = 0
+    uint8_t status_flags = gSensorState.ready_flag ? 0x01 : 0x00;
+    pack_frame2(&gSensorState, status_flags, 0, buf);
+    struct can_frame f2;
+    f2.can_id  = CAN_TX_FRAME2_ID;
+    f2.can_dlc = 8;
+    memcpy(f2.data, buf, 8);
+    mcp2515.sendMessage(&f2);
 }
 
 #endif
