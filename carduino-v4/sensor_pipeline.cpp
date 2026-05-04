@@ -40,6 +40,17 @@ static float ewma_pre_sc_press = 0.0f;
 static unsigned long boot_time_ms = 0;
 static const unsigned long READY_DELAY_MS = 1000;
 
+// Wire format is uint16_t (engineering units × 10). thermistor_to_F can return
+// negatives for cold readings; casting a negative float to uint16_t is UB and
+// would wrap to a garbage value on the CAN bus. Clamp to [0, 65535].
+// Sensor electrical faults are signaled via the health bitmask (Phase D), not
+// via magic temperature values, so clamping to 0 here is safe.
+static inline uint16_t clamp_to_u16(float v) {
+    if (v < 0.0f)        return 0;
+    if (v > 65535.0f)    return 65535;
+    return (uint16_t)v;
+}
+
 void sensor_pipeline_init() {
     pinMode(PIN_OIL_TEMP, INPUT);
     pinMode(PIN_POST_SC_TEMP, INPUT);
@@ -71,11 +82,13 @@ void SensorPhase() {
     ewma_fuel_press   = ewma_step(ewma_fuel_press,   raw_fuel_press,   EWMA_ALPHA_FUEL_PRESS);
     ewma_pre_sc_press = ewma_step(ewma_pre_sc_press, raw_pre_sc_press, EWMA_ALPHA_PRE_SC_P);
 
-    // Convert to engineering units × 10
-    gSensorState.oil_temp_F_x10 = (uint16_t)(thermistor_to_F(
+    // Convert to engineering units × 10. Thermistors can return negative
+    // floats for cold readings; clamp before the uint16_t cast (see above).
+    // Pressure functions are mathematically non-negative so direct cast is safe.
+    gSensorState.oil_temp_F_x10 = clamp_to_u16(thermistor_to_F(
         (int)ewma_oil_temp, OIL_TEMP_PULLUP_OHMS, OIL_TEMP_R25, OIL_TEMP_BETA) * 10.0f);
 
-    gSensorState.post_sc_temp_F_x10 = (uint16_t)(thermistor_to_F(
+    gSensorState.post_sc_temp_F_x10 = clamp_to_u16(thermistor_to_F(
         (int)ewma_post_sc_temp, POST_SC_TEMP_PULLUP_OHMS, POST_SC_TEMP_R25, POST_SC_TEMP_BETA) * 10.0f);
 
     gSensorState.oil_pressure_psi_x10  = (uint16_t)(pressure_psi((int)ewma_oil_press,  OIL_PRESS_PSI_AT_FS) * 10.0f);
