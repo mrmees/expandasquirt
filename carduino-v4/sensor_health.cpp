@@ -26,6 +26,36 @@ bool debounce_update(DebounceState* d, bool sample_bad) {
     return d->asserted;
 }
 
+void channel_health_init(ChannelHealth* ch) {
+    debounce_init(&ch->electrical_db);
+    debounce_init(&ch->plausibility_db);
+    ch->flatline = false;
+    ch->age_ticks = 0;
+    ch->tick_subdiv = 0;
+}
+
+bool channel_health_update(ChannelHealth* ch, int raw_adc, float eng_value,
+                           bool (*plausibility_fn)(float)) {
+    bool elec_bad = electrical_fault(raw_adc);
+    bool plaus_bad = !plausibility_fn(eng_value);
+
+    bool elec_asserted = debounce_update(&ch->electrical_db, elec_bad);
+    bool plaus_asserted = debounce_update(&ch->plausibility_db, plaus_bad);
+
+    bool healthy = !elec_asserted && !plaus_asserted && !ch->flatline;
+    if (healthy) {
+        ch->age_ticks = 0;
+        ch->tick_subdiv = 0;
+    } else {
+        ch->tick_subdiv++;
+        if (ch->tick_subdiv >= 10) {
+            ch->tick_subdiv = 0;
+            if (ch->age_ticks < 255) ch->age_ticks++;
+        }
+    }
+    return healthy;
+}
+
 bool plausibility_oil_temp_F(float v) {
     return v >= -40.0f && v <= 350.0f;
 }

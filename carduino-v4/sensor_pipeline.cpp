@@ -1,4 +1,5 @@
 #include "sensor_pipeline.h"
+#include "sensor_health.h"
 #include <math.h>
 
 float thermistor_to_F(int adc_raw, float pullup_ohms, float r25, float beta) {
@@ -29,6 +30,12 @@ float ewma_step(float current, float new_sample, float alpha) {
 #include <Arduino.h>
 
 SensorState gSensorState = {0};
+
+static ChannelHealth h_oil_temp;
+static ChannelHealth h_post_sc_temp;
+static ChannelHealth h_oil_press;
+static ChannelHealth h_fuel_press;
+static ChannelHealth h_pre_sc_press;
 
 // Per-channel filtered raw ADC values
 static float ewma_oil_temp     = 0.0f;
@@ -65,6 +72,12 @@ void sensor_pipeline_init() {
     ewma_oil_press    = analogRead(PIN_OIL_PRESS);
     ewma_fuel_press   = analogRead(PIN_FUEL_PRESS);
     ewma_pre_sc_press = analogRead(PIN_PRE_SC_PRESS);
+
+    channel_health_init(&h_oil_temp);
+    channel_health_init(&h_post_sc_temp);
+    channel_health_init(&h_oil_press);
+    channel_health_init(&h_fuel_press);
+    channel_health_init(&h_pre_sc_press);
 }
 
 void SensorPhase() {
@@ -94,6 +107,40 @@ void SensorPhase() {
     gSensorState.oil_pressure_psi_x10  = (uint16_t)(pressure_psi((int)ewma_oil_press,  OIL_PRESS_PSI_AT_FS) * 10.0f);
     gSensorState.fuel_pressure_psi_x10 = (uint16_t)(pressure_psi((int)ewma_fuel_press, FUEL_PRESS_PSI_AT_FS) * 10.0f);
     gSensorState.pre_sc_pressure_kpa_x10 = (uint16_t)(bosch_kpa((int)ewma_pre_sc_press) * 10.0f);
+
+    uint8_t mask = 0;
+    if (channel_health_update(&h_oil_temp, raw_oil_temp,
+                              gSensorState.oil_temp_F_x10 / 10.0f,
+                              plausibility_oil_temp_F)) {
+        mask |= 0x01;
+    }
+    if (channel_health_update(&h_post_sc_temp, raw_post_sc_temp,
+                              gSensorState.post_sc_temp_F_x10 / 10.0f,
+                              plausibility_oil_temp_F)) {
+        mask |= 0x02;
+    }
+    if (channel_health_update(&h_oil_press, raw_oil_press,
+                              gSensorState.oil_pressure_psi_x10 / 10.0f,
+                              plausibility_pressure_psi)) {
+        mask |= 0x04;
+    }
+    if (channel_health_update(&h_fuel_press, raw_fuel_press,
+                              gSensorState.fuel_pressure_psi_x10 / 10.0f,
+                              plausibility_pressure_psi)) {
+        mask |= 0x08;
+    }
+    if (channel_health_update(&h_pre_sc_press, raw_pre_sc_press,
+                              gSensorState.pre_sc_pressure_kpa_x10 / 10.0f,
+                              plausibility_kpa)) {
+        mask |= 0x10;
+    }
+    gSensorState.health_bitmask = mask;
+
+    gSensorState.age_ticks[0] = h_oil_temp.age_ticks;
+    gSensorState.age_ticks[1] = h_post_sc_temp.age_ticks;
+    gSensorState.age_ticks[2] = h_oil_press.age_ticks;
+    gSensorState.age_ticks[3] = h_fuel_press.age_ticks;
+    gSensorState.age_ticks[4] = h_pre_sc_press.age_ticks;
 
     // Ready flag clears for the first second
     gSensorState.ready_flag = (millis() - boot_time_ms >= READY_DELAY_MS) ? 1 : 0;

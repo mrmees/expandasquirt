@@ -85,15 +85,21 @@ void CanSendPhase() {
     f1.can_id  = CAN_TX_FRAME1_ID;
     f1.can_dlc = 8;
     memcpy(f1.data, buf, 8);
+    // TODO(task-after-18): track sendMessage return values.
     mcp2515.sendMessage(&f1);
 
-    // Frame 2 — for now, status flags = ready bit only, max_age = 0
+    // Frame 2
     uint8_t status_flags = gSensorState.ready_flag ? 0x01 : 0x00;
-    pack_frame2(&gSensorState, status_flags, 0, buf);
+    uint8_t max_age = 0;
+    for (int i = 0; i < 5; i++) {
+        if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];
+    }
+    pack_frame2(&gSensorState, status_flags, max_age, buf);
     struct can_frame f2;
     f2.can_id  = CAN_TX_FRAME2_ID;
     f2.can_dlc = 8;
     memcpy(f2.data, buf, 8);
+    // TODO(task-after-18): track sendMessage return values.
     mcp2515.sendMessage(&f2);
 }
 
