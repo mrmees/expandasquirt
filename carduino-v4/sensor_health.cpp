@@ -25,3 +25,15 @@ bool debounce_update(DebounceState* d, bool sample_bad) {
     }
     return d->asserted;
 }
+
+bool plausibility_oil_temp_F(float v) {
+    return v >= -40.0f && v <= 350.0f;
+}
+
+bool plausibility_pressure_psi(float v) {
+    return v >= -5.0f && v <= 200.0f;
+}
+
+bool plausibility_kpa(float v) {
+    return v >= 0.0f && v <= 200.0f;
+}

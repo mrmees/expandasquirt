@@ -7,6 +7,9 @@ extern "C" {
 bool electrical_fault(int adc_raw);
 void debounce_init(DebounceState* d);
 bool debounce_update(DebounceState* d, bool sample_bad);
+bool plausibility_oil_temp_F(float v);
+bool plausibility_pressure_psi(float v);
+bool plausibility_kpa(float v);
 }
 
 TEST_CASE(electrical_fault_at_zero) {
@@ -68,4 +71,23 @@ TEST_CASE(debounce_intermittent_bad_does_not_clear) {
     for (int i = 0; i < HEALTH_DEBOUNCE_GOOD - 2; i++) debounce_update(&d, false);
     debounce_update(&d, true);
     ASSERT_TRUE(debounce_update(&d, false));
+}
+
+TEST_CASE(plausibility_oil_temp_in_range) {
+    ASSERT_TRUE(plausibility_oil_temp_F(180.0f));
+    ASSERT_TRUE(plausibility_oil_temp_F(-30.0f));
+    ASSERT_TRUE(!plausibility_oil_temp_F(-100.0f));
+    ASSERT_TRUE(!plausibility_oil_temp_F(500.0f));
+}
+
+TEST_CASE(plausibility_pressure_in_range) {
+    ASSERT_TRUE(plausibility_pressure_psi(50.0f));
+    ASSERT_TRUE(!plausibility_pressure_psi(-10.0f));
+    ASSERT_TRUE(!plausibility_pressure_psi(250.0f));
+}
+
+TEST_CASE(plausibility_kpa_in_range) {
+    ASSERT_TRUE(plausibility_kpa(101.0f));
+    ASSERT_TRUE(!plausibility_kpa(-5.0f));
+    ASSERT_TRUE(!plausibility_kpa(300.0f));
 }
