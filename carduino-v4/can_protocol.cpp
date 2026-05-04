@@ -90,6 +90,7 @@ void CanSendPhase() {
 
     // Frame 2
     uint8_t status_flags = gSensorState.ready_flag ? 0x01 : 0x00;
+    if (any_channel_flatlined()) status_flags |= 0x20;  // bit 5: flatline
     uint8_t max_age = 0;
     for (int i = 0; i < 5; i++) {
         if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];

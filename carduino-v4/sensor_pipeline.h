@@ -43,6 +43,9 @@ extern SensorState gSensorState;
 void sensor_pipeline_init();
 void SensorPhase();   // called at SENSOR_HZ from main loop
 
+// True if any sensor channel is currently flatlined.
+bool any_channel_flatlined(void);
+
 #ifdef __cplusplus
 }
 #endif

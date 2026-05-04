@@ -1,4 +1,5 @@
 #include "sensor_health.h"
+#include <math.h>
 
 bool electrical_fault(int adc_raw) {
     // Per design section 7.1: raw < 1% of FS or > 99% of FS.
@@ -34,15 +35,50 @@ void channel_health_init(ChannelHealth* ch) {
     ch->tick_subdiv = 0;
 }
 
+void flatline_init(FlatlineState* f) {
+    f->last_value = 0.0f;
+    f->stable_since_ms = 0;
+    f->flatline_asserted = false;
+}
+
+bool flatline_update(FlatlineState* f, float current_value, unsigned long now_ms,
+                     bool engine_running) {
+    if (!engine_running) {
+        f->flatline_asserted = false;
+        f->last_value = current_value;
+        f->stable_since_ms = now_ms;
+        return false;
+    }
+
+    float change = fabsf(current_value - f->last_value);
+    float denom = fabsf(f->last_value);
+    float rel = (denom > 0.1f) ? (change / denom) : change;
+
+    if (rel > 0.01f) {
+        f->last_value = current_value;
+        f->stable_since_ms = now_ms;
+        f->flatline_asserted = false;
+    } else {
+        if (now_ms - f->stable_since_ms >= FLATLINE_TIMEOUT_MS) {
+            f->flatline_asserted = true;
+        }
+    }
+    return f->flatline_asserted;
+}
+
 bool channel_health_update(ChannelHealth* ch, int raw_adc, float eng_value,
-                           bool (*plausibility_fn)(float)) {
+                           bool (*plausibility_fn)(float),
+                           FlatlineState* flat, unsigned long now_ms,
+                           bool engine_running) {
     bool elec_bad = electrical_fault(raw_adc);
     bool plaus_bad = !plausibility_fn(eng_value);
+    bool flat_bad = flatline_update(flat, eng_value, now_ms, engine_running);
 
     bool elec_asserted = debounce_update(&ch->electrical_db, elec_bad);
     bool plaus_asserted = debounce_update(&ch->plausibility_db, plaus_bad);
+    ch->flatline = flat_bad;
 
-    bool healthy = !elec_asserted && !plaus_asserted && !ch->flatline;
+    bool healthy = !elec_asserted && !plaus_asserted && !flat_bad;
     if (healthy) {
         ch->age_ticks = 0;
         ch->tick_subdiv = 0;

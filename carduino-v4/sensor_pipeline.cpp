@@ -37,6 +37,12 @@ static ChannelHealth h_oil_press;
 static ChannelHealth h_fuel_press;
 static ChannelHealth h_pre_sc_press;
 
+static FlatlineState flat_oil_temp;
+static FlatlineState flat_post_sc_temp;
+static FlatlineState flat_oil_press;
+static FlatlineState flat_fuel_press;
+static FlatlineState flat_pre_sc_press;
+
 // Per-channel filtered raw ADC values
 static float ewma_oil_temp     = 0.0f;
 static float ewma_post_sc_temp = 0.0f;
@@ -56,6 +62,16 @@ static inline uint16_t clamp_to_u16(float v) {
     if (v < 0.0f)        return 0;
     if (v > 65535.0f)    return 65535;
     return (uint16_t)v;
+}
+
+static bool engine_running_now(int raw_oil_press, float oil_press_psi) {
+    bool oil_press_healthy = !electrical_fault(raw_oil_press)
+                             && plausibility_pressure_psi(oil_press_psi);
+    if (oil_press_healthy) {
+        return oil_press_psi > ENGINE_RUNNING_OIL_PSI;
+    }
+    // Sensor faulted; assume running so flatline state is not falsely cleared.
+    return true;
 }
 
 void sensor_pipeline_init() {
@@ -78,9 +94,23 @@ void sensor_pipeline_init() {
     channel_health_init(&h_oil_press);
     channel_health_init(&h_fuel_press);
     channel_health_init(&h_pre_sc_press);
+
+    flatline_init(&flat_oil_temp);
+    flatline_init(&flat_post_sc_temp);
+    flatline_init(&flat_oil_press);
+    flatline_init(&flat_fuel_press);
+    flatline_init(&flat_pre_sc_press);
+}
+
+bool any_channel_flatlined(void) {
+    return h_oil_temp.flatline || h_post_sc_temp.flatline
+        || h_oil_press.flatline || h_fuel_press.flatline
+        || h_pre_sc_press.flatline;
 }
 
 void SensorPhase() {
+    unsigned long now_ms = millis();
+
     // Raw reads
     int raw_oil_temp     = analogRead(PIN_OIL_TEMP);
     int raw_post_sc_temp = analogRead(PIN_POST_SC_TEMP);
@@ -108,30 +138,37 @@ void SensorPhase() {
     gSensorState.fuel_pressure_psi_x10 = (uint16_t)(pressure_psi((int)ewma_fuel_press, FUEL_PRESS_PSI_AT_FS) * 10.0f);
     gSensorState.pre_sc_pressure_kpa_x10 = (uint16_t)(bosch_kpa((int)ewma_pre_sc_press) * 10.0f);
 
+    bool eng = engine_running_now(raw_oil_press, gSensorState.oil_pressure_psi_x10 / 10.0f);
+
     uint8_t mask = 0;
     if (channel_health_update(&h_oil_temp, raw_oil_temp,
                               gSensorState.oil_temp_F_x10 / 10.0f,
-                              plausibility_oil_temp_F)) {
+                              plausibility_oil_temp_F,
+                              &flat_oil_temp, now_ms, eng)) {
         mask |= 0x01;
     }
     if (channel_health_update(&h_post_sc_temp, raw_post_sc_temp,
                               gSensorState.post_sc_temp_F_x10 / 10.0f,
-                              plausibility_oil_temp_F)) {
+                              plausibility_oil_temp_F,
+                              &flat_post_sc_temp, now_ms, eng)) {
         mask |= 0x02;
     }
     if (channel_health_update(&h_oil_press, raw_oil_press,
                               gSensorState.oil_pressure_psi_x10 / 10.0f,
-                              plausibility_pressure_psi)) {
+                              plausibility_pressure_psi,
+                              &flat_oil_press, now_ms, eng)) {
         mask |= 0x04;
     }
     if (channel_health_update(&h_fuel_press, raw_fuel_press,
                               gSensorState.fuel_pressure_psi_x10 / 10.0f,
-                              plausibility_pressure_psi)) {
+                              plausibility_pressure_psi,
+                              &flat_fuel_press, now_ms, eng)) {
         mask |= 0x08;
     }
     if (channel_health_update(&h_pre_sc_press, raw_pre_sc_press,
                               gSensorState.pre_sc_pressure_kpa_x10 / 10.0f,
-                              plausibility_kpa)) {
+                              plausibility_kpa,
+                              &flat_pre_sc_press, now_ms, eng)) {
         mask |= 0x10;
     }
     gSensorState.health_bitmask = mask;
@@ -143,6 +180,6 @@ void SensorPhase() {
     gSensorState.age_ticks[4] = h_pre_sc_press.age_ticks;
 
     // Ready flag clears for the first second
-    gSensorState.ready_flag = (millis() - boot_time_ms >= READY_DELAY_MS) ? 1 : 0;
+    gSensorState.ready_flag = (now_ms - boot_time_ms >= READY_DELAY_MS) ? 1 : 0;
 }
 #endif
