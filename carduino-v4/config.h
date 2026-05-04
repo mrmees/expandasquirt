@@ -63,7 +63,7 @@
 
 // ===== Health thresholds =====
 #define HEALTH_DEBOUNCE_BAD   3   // samples
-#define HEALTH_DEBOUNCE_GOOD  5   // samples
+#define HEALTH_DEBOUNCE_GOOD  10  // samples
 #define FLATLINE_TIMEOUT_MS   5000
 #define ENGINE_RUNNING_RPM    500
 #define ENGINE_RUNNING_OIL_PSI 5

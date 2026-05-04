@@ -11,6 +11,16 @@ extern "C" {
 
 bool electrical_fault(int adc_raw);
 
+typedef struct DebounceState {
+    uint8_t bad_count;
+    uint8_t good_count;
+    bool    asserted;
+} DebounceState;
+
+void debounce_init(DebounceState* d);
+// Returns true if asserted after this update.
+bool debounce_update(DebounceState* d, bool sample_bad);
+
 #ifdef __cplusplus
 }
 #endif
