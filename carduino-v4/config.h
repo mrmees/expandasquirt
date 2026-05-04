@@ -55,7 +55,7 @@
 #define CAN_TX_FRAME2_ID  1026  // 0x402
 #define CAN_RX_RPM_ID     1512  // 0x5E8 (MS3 dash broadcast)
 #define CAN_BITRATE       CAN_500KBPS
-#define CAN_CRYSTAL       MCP_8MHZ
+#define CAN_CRYSTAL       MCP_16MHZ
 
 // ===== Watchdog =====
 #define WATCHDOG_NORMAL_MS       1000

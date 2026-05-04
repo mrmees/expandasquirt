@@ -62,7 +62,7 @@ These are explicitly v5+ scope.
 **Keyestudio EF02037 MCP2515 CAN-Bus Shield**
 - MCP2515 controller + TJA1050 transceiver
 - Plugs directly into Uno R4 headers (5V SPI, no level shifting)
-- 8 MHz crystal (verify on shield silkscreen before flashing — wrong setting silently breaks bitrate)
+- 16 MHz crystal (confirmed on actual EF02037 silkscreen — `Y16.000H049`. Earlier design assumed 8 MHz; bench verify caught the mismatch.)
 - Occupies D2 (INT) and D10–D13 (SPI)
 
 ### 2.3 Pin map
@@ -285,7 +285,7 @@ typedef struct {
 ### 5.1 Bus parameters
 
 - **Bitrate:** 500 kbps (matches MS3Pro standard)
-- **Crystal on shield:** 8 MHz (verify silkscreen before flashing)
+- **Crystal on shield:** 16 MHz (confirmed on actual hardware)
 - **Mode:** Normal mode with hardware-level filtering (only ID 1512 admitted to RX buffer)
 
 ### 5.2 Bus utilization
@@ -665,7 +665,7 @@ Read on boot, displayed via BLE on connect. ~2 flash writes per boot — negligi
 The following items are placeholders in the design that need bench verification before flashing the production firmware:
 
 ### Hardware/sensor confirmation
-1. **MCP2515 crystal frequency** — eyeball the silkscreen on the EF02037 to confirm 8 MHz vs 16 MHz. Wrong setting silently breaks bitrate.
+1. **MCP2515 crystal frequency** — ✅ resolved. Actual hardware is 16 MHz (`Y16.000H049`); `config.h` updated to `MCP_16MHZ`.
 2. **Pressure sensor output type** — verify whether the 0–100 PSI gauge sensors are 0–5V or 0.5–4.5V. Set conversion constants accordingly.
 3. **Bosch 0 261 230 146 transfer function** — verify against actual datasheet at first power-up. Inferred placeholder: `kPa_abs ≈ 24.7 × V + 0.12`. Calibrate against known atmospheric pressure on bench.
 4. **Post-SC IAT (GM open-element) curve** — verify R₂₅ and β against the actual part purchased.
