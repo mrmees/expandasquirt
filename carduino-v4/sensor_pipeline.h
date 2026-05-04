@@ -21,6 +21,10 @@ float pressure_psi(int adc_raw, float psi_at_full_scale);
 // to kPa absolute. Uses BOSCH_SLOPE / BOSCH_OFFSET from config.h.
 float bosch_kpa(int adc_raw);
 
+// Single EWMA step. Returns the new filtered value.
+// alpha in (0, 1]: higher = more responsive, lower = more filtered.
+float ewma_step(float current, float new_sample, float alpha);
+
 #ifdef __cplusplus
 }
 #endif

@@ -20,3 +20,7 @@ float bosch_kpa(int adc_raw) {
     float v = ((float)adc_raw / (float)ADC_MAX_COUNT) * V_REF;
     return BOSCH_SLOPE * v + BOSCH_OFFSET;
 }
+
+float ewma_step(float current, float new_sample, float alpha) {
+    return (1.0f - alpha) * current + alpha * new_sample;
+}

@@ -7,6 +7,7 @@ extern "C" {
 float thermistor_to_F(int adc_raw, float pullup_ohms, float r25, float beta);
 float pressure_psi(int adc_raw, float psi_at_full_scale);
 float bosch_kpa(int adc_raw);
+float ewma_step(float current, float new_sample, float alpha);
 }
 
 TEST_CASE(thermistor_at_25C_returns_77F) {
@@ -64,4 +65,29 @@ TEST_CASE(bosch_kpa_at_atmospheric) {
 TEST_CASE(bosch_kpa_at_zero_input) {
     // 0V -> just the offset
     ASSERT_NEAR(bosch_kpa(0), BOSCH_OFFSET, 0.01f);
+}
+
+TEST_CASE(ewma_steady_state_returns_input) {
+    float v = 100.0f;
+    for (int i = 0; i < 100; i++) v = ewma_step(v, 100.0f, 0.1f);
+    ASSERT_NEAR(v, 100.0f, 0.01f);
+}
+
+TEST_CASE(ewma_alpha_one_replaces) {
+    float v = 50.0f;
+    v = ewma_step(v, 200.0f, 1.0f);
+    ASSERT_NEAR(v, 200.0f, 0.001f);
+}
+
+TEST_CASE(ewma_alpha_zero_holds) {
+    float v = 50.0f;
+    v = ewma_step(v, 200.0f, 0.0f);
+    ASSERT_NEAR(v, 50.0f, 0.001f);
+}
+
+TEST_CASE(ewma_settles_toward_target) {
+    float v = 0.0f;
+    // After ~5 / alpha samples, should be within ~99% of target
+    for (int i = 0; i < 100; i++) v = ewma_step(v, 100.0f, 0.1f);
+    ASSERT_NEAR(v, 100.0f, 1.0f);
 }
