@@ -11,6 +11,17 @@ void pack_frame1(const SensorState* s, uint8_t* out8) {
     out8[7] =  s->pre_sc_pressure_kpa_x10        & 0xFF;
 }
 
+void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, uint8_t* out8) {
+    out8[0] = (s->post_sc_temp_F_x10 >> 8) & 0xFF;
+    out8[1] =  s->post_sc_temp_F_x10        & 0xFF;
+    out8[2] = 0xFF;  // reserved (future CAN ADC06)
+    out8[3] = 0xFF;
+    out8[4] = s->sequence_counter;
+    out8[5] = s->health_bitmask;
+    out8[6] = status_flags;
+    out8[7] = max_age;
+}
+
 #ifdef ARDUINO
 
 #include <SPI.h>
