@@ -81,16 +81,22 @@ def main() -> None:
             data_hex = msg.data.hex(" ")
 
             if msg.arbitration_id == FRAME1_ID:
-                print(f"  {id_hex}  {data_hex}  {decode_frame1(msg.data)}")
+                if len(msg.data) != 8:
+                    print(f"  {id_hex}  {data_hex}  !! malformed (DLC={len(msg.data)}, expected 8)")
+                else:
+                    print(f"  {id_hex}  {data_hex}  {decode_frame1(msg.data)}")
             elif msg.arbitration_id == FRAME2_ID:
-                seq = msg.data[4]
-                if last_seq is not None:
-                    expected = (last_seq + 1) & 0xFF
-                    if seq != expected:
-                        seq_anomalies += 1
-                        print(f"  !! SEQ skip: expected {expected}, got {seq}")
-                last_seq = seq
-                print(f"  {id_hex}  {data_hex}  {decode_frame2(msg.data)}")
+                if len(msg.data) != 8:
+                    print(f"  {id_hex}  {data_hex}  !! malformed (DLC={len(msg.data)}, expected 8)")
+                else:
+                    seq = msg.data[4]
+                    if last_seq is not None:
+                        expected = (last_seq + 1) & 0xFF
+                        if seq != expected:
+                            seq_anomalies += 1
+                            print(f"  !! SEQ skip: expected {expected}, got {seq}")
+                    last_seq = seq
+                    print(f"  {id_hex}  {data_hex}  {decode_frame2(msg.data)}")
             else:
                 print(f"  {id_hex}  {data_hex}  (unknown)")
 
