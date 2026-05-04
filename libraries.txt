@@ -1,0 +1,9 @@
+# CARDUINO v4 - pinned library versions
+# Update this file whenever bumping a dependency.
+
+arduino:renesas_uno @ 1.5.3
+ArduinoBLE @ 2.0.1
+Arduino_LED_Matrix @ 1.1.0
+mcp2515 (autowp) @ 49e0d7d
+OTAUpdate @ bundled with renesas_uno
+WiFiS3 @ bundled with renesas_uno
