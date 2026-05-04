@@ -2,6 +2,7 @@
 #define SENSOR_PIPELINE_H
 
 #include "config.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,6 +25,23 @@ float bosch_kpa(int adc_raw);
 // Single EWMA step. Returns the new filtered value.
 // alpha in (0, 1]: higher = more responsive, lower = more filtered.
 float ewma_step(float current, float new_sample, float alpha);
+
+typedef struct {
+    uint16_t  oil_temp_F_x10;
+    uint16_t  post_sc_temp_F_x10;
+    uint16_t  oil_pressure_psi_x10;
+    uint16_t  fuel_pressure_psi_x10;
+    uint16_t  pre_sc_pressure_kpa_x10;
+    uint8_t   age_ticks[5];
+    uint8_t   health_bitmask;     // populated in Phase D
+    uint8_t   ready_flag;
+    uint8_t   sequence_counter;
+} SensorState;
+
+extern SensorState gSensorState;
+
+void sensor_pipeline_init();
+void SensorPhase();   // called at SENSOR_HZ from main loop
 
 #ifdef __cplusplus
 }
