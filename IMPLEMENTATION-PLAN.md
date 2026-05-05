@@ -4275,7 +4275,3152 @@ Acceptable to skip until the sensor is mounted in the engine bay's airflow, wher
 
 ---
 
-## Self-Review
+# v4.x — Companion App + Maintenance Mode
+
+> **Spec:** `V4X-DESIGN.md`. **Phase J (Tasks 41-44) above is superseded** by Phases L-P below — the AP+upload approach is replaced with JAndrassy/ArduinoOTA HTTP push from an Android companion app.
+
+**Goal:** Android companion app (Kotlin/Compose) that replaces nRF Connect for daily live-console use, plus the small firmware additions (maintenance state machine, new BLE commands, ArduinoOTA integration) required for wireless OTA from that app.
+
+**Architecture:** Two codebases. Firmware extends the existing sketch with `maintenance_mode.{h,cpp}` and ArduinoOTA library integration. Android app is a new sibling project at `app/` (separate from the Arduino sketch). Communication: BLE NUS for normal-mode and maintenance arming, HTTP POST to ArduinoOTA listener on port 65280 during OTA.
+
+**Tech stack additions:**
+- Firmware: `JAndrassy/ArduinoOTA` (with `InternalStorageRenesas` apply path)
+- Android: Kotlin 2.x, Jetpack Compose, AndroidX BLE, `WifiManager.startLocalOnlyHotspot()`, `NsdManager` (mDNS), OkHttp 4.x, AndroidX DataStore (Preferences flavor)
+
+---
+
+## Phase L: Bench Prototypes (Tasks 53-55)
+
+🛑 **Gating phase.** Both prototypes must pass before Phase M begins. They verify the two big unverified assumptions in `V4X-DESIGN.md` §11.
+
+### Task 53: 🔧 Verify R4 ArduinoOTA accepts curl push from laptop on phone hotspot
+
+**Files:**
+- Create: `prototypes/ota_arduinoota/jandrassy_proto.ino`
+- Create: `prototypes/ota_arduinoota/test-sketch/test-sketch.ino` (a tiny sketch we'll push)
+- Create: `prototypes/ota_arduinoota/README.md` (results)
+
+**What this verifies:** R4 modem firmware 0.6.0 actually bridges incoming TCP connections via `WiFiServer.available()` to the host MCU's ArduinoOTA listener, *and* the JAndrassy mDNS responder reaches the phone-hotspot network.
+
+- [ ] **Step 1: Install JAndrassy/ArduinoOTA library**
+
+```bash
+"C:/Program Files/Arduino CLI/arduino-cli.exe" lib install ArduinoOTA
+"C:/Program Files/Arduino CLI/arduino-cli.exe" lib list | grep -i arduinoota
+```
+Expected: shows `ArduinoOTA 1.x.y` installed in user sketchbook.
+
+- [ ] **Step 2: Write `jandrassy_proto.ino` — minimal listener**
+
+```cpp
+#include <WiFiS3.h>
+#include <ArduinoOTA.h>
+#include "arduino_secrets.h"  // SECRET_SSID, SECRET_PASS — phone hotspot creds
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial && millis() < 3000);
+  Serial.println("Connecting to hotspot...");
+
+  WiFi.begin(SECRET_SSID, SECRET_PASS);
+  while (WiFi.status() != WL_CONNECTED) { delay(200); Serial.print("."); }
+  Serial.println();
+  Serial.print("IP: "); Serial.println(WiFi.localIP());
+
+  ArduinoOTA.begin(WiFi.localIP(), "carduino-v4-proto", "testpw", InternalStorage);
+  Serial.println("ArduinoOTA listening on port 65280");
+}
+
+void loop() {
+  ArduinoOTA.poll();
+  static unsigned long lastBeat = 0;
+  if (millis() - lastBeat > 1000) {
+    lastBeat = millis();
+    Serial.println("alive");
+  }
+}
+```
+
+Create `arduino_secrets.h` with the actual hotspot creds (gitignored — `prototypes/**/arduino_secrets.h` is already in `.gitignore`).
+
+- [ ] **Step 3: Write `test-sketch.ino` — what we push**
+
+```cpp
+void setup() {
+  Serial.begin(115200);
+  while (!Serial && millis() < 3000);
+}
+void loop() {
+  Serial.println("HELLO_FROM_OTA_TARGET");
+  delay(500);
+}
+```
+
+- [ ] **Step 4: Compile + flash listener via USB**
+
+```bash
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi prototypes/ota_arduinoota/jandrassy_proto/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" upload --fqbn arduino:renesas_uno:unor4wifi --port COM8 prototypes/ota_arduinoota/jandrassy_proto/
+```
+
+Expected serial output: `Connecting...`, `IP: 192.168.43.X`, `ArduinoOTA listening on port 65280`, periodic `alive`.
+
+- [ ] **Step 5: Compile test-sketch to a `.bin`**
+
+```bash
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi --output-dir prototypes/ota_arduinoota/test-sketch/build/ prototypes/ota_arduinoota/test-sketch/
+```
+
+Expected: `prototypes/ota_arduinoota/test-sketch/build/test-sketch.ino.bin` exists, ~10-20 KB.
+
+- [ ] **Step 6: From a laptop on the phone hotspot, push via curl**
+
+Note device IP from Step 4. Replace `192.168.43.7` with actual.
+
+```bash
+curl -u arduino:testpw \
+  -X POST \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @prototypes/ota_arduinoota/test-sketch/build/test-sketch.ino.bin \
+  http://192.168.43.7:65280/sketch
+```
+
+Expected: `OK` response after a few seconds. Within ~10 sec, the R4 reboots into the test sketch.
+
+- [ ] **Step 7: Verify test sketch is running**
+
+Reconnect serial monitor. Expected output: continuous `HELLO_FROM_OTA_TARGET` every 500 ms. **This proves end-to-end wireless OTA via JAndrassy works on R4 with modem 0.6.0.**
+
+- [ ] **Step 8: Re-flash the listener via USB to recover, then test mDNS discovery**
+
+Re-flash `jandrassy_proto.ino` over USB. Then from the laptop:
+
+```bash
+# Linux/macOS:
+dns-sd -B _arduino._tcp local.
+# Or:
+avahi-browse -r _arduino._tcp
+# Windows:
+dns-sd -B _arduino._tcp local.   # if available; else use a phone with NsdManager test app
+```
+
+Expected: `carduino-v4-proto` appears in service browse results within ~5 sec, with the device's IP and port 65280. **This proves mDNS responder works on R4.**
+
+- [ ] **Step 9: Document results in `prototypes/ota_arduinoota/README.md`**
+
+```markdown
+# JAndrassy/ArduinoOTA bench prototype results
+
+**Date:** YYYY-MM-DD
+**R4 modem firmware:** 0.6.0 (verified via `WiFi.firmwareVersion()`)
+**Phone hotspot:** Samsung S25+ "MEES" (record actual)
+
+## Step 7 — HTTP push
+- Device IP: 192.168.43.X
+- Push duration: N seconds
+- Test sketch booted: yes/no
+- Notes:
+
+## Step 8 — mDNS discovery
+- Service appeared: yes/no
+- Discovery latency: N seconds
+- Notes:
+
+## Verdict
+- ☐ PASS — proceed to Phase M
+- ☐ FAIL — [describe what failed; design needs revision]
+```
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add prototypes/ota_arduinoota/jandrassy_proto/ prototypes/ota_arduinoota/test-sketch/ prototypes/ota_arduinoota/README.md
+git commit -m "test: verify JAndrassy ArduinoOTA + mDNS on R4 with modem 0.6.0"
+```
+
+---
+
+### Task 54: 🔧 Verify Android LocalOnlyHotspot + OkHttp routes correctly
+
+**Files:**
+- Create: `app/proto-loh/` (throwaway minimal Android Studio project — replaced wholesale by Phase N's real app)
+- Create: `prototypes/loh_android/notes-results.md`
+
+**What this verifies:** Samsung S25+ on Android 16 / One UI 8 actually permits `WifiManager.startLocalOnlyHotspot()`, the auto-generated SSID/password are readable from the callback, and an OkHttp POST routes through the LOH network rather than cellular when `bindProcessToNetwork` is set.
+
+- [ ] **Step 1: Create minimal Android Studio project**
+
+In Android Studio: New Project → Empty Activity (Compose). Module name `proto-loh`. Min SDK 26 (Android 8.0), target SDK 35 (Android 16).
+
+Add to `app/build.gradle.kts` (Module: app):
+```kotlin
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+}
+```
+
+Add to `app/src/main/AndroidManifest.xml`:
+```xml
+<uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+- [ ] **Step 2: Write `MainActivity.kt` — start LOH, POST to a test target**
+
+```kotlin
+package works.mees.carduino.protoloh
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Network
+import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
+
+class MainActivity : ComponentActivity() {
+    private var lohReservation: WifiManager.LocalOnlyHotspotReservation? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ActivityCompat.requestPermissions(this, arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.NEARBY_WIFI_DEVICES,
+        ), 1)
+
+        setContent {
+            var status by remember { mutableStateOf("idle") }
+            val scope = rememberCoroutineScope()
+            Surface { Column(Modifier.padding(16.dp)) {
+                Text("LOH proto: $status")
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { scope.launch { status = startAndPost(::onStatus) } }) {
+                    Text("Start LOH and POST")
+                }
+            } }
+            // status updates via callback
+        }
+    }
+
+    private fun onStatus(s: String) { /* called from inside startAndPost */ }
+
+    private suspend fun startAndPost(report: (String) -> Unit): String = withContext(Dispatchers.IO) {
+        val wifi = getSystemService(WIFI_SERVICE) as WifiManager
+        val (ssid, psk, network) = startLoh(wifi) ?: return@withContext "LOH FAILED"
+
+        val client = OkHttpClient.Builder()
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .socketFactory(network.socketFactory)
+            .build()
+
+        val body = "PROTO_TEST_BYTES".toByteArray().toRequestBody("application/octet-stream".toMediaType())
+        val req = Request.Builder()
+            .url("http://192.168.43.1:8080/echo")  // laptop on LOH network
+            .post(body)
+            .build()
+
+        val code = try {
+            client.newCall(req).execute().use { it.code }
+        } catch (e: Exception) {
+            "ERR ${e.message}"
+        }
+
+        lohReservation?.close()
+        "LOH ssid=$ssid psk=$psk code=$code"
+    }
+
+    private suspend fun startLoh(wifi: WifiManager): Triple<String, String, Network>? {
+        // Suspending wrapper around startLocalOnlyHotspot — implementation omitted for brevity;
+        // see kotlinx.coroutines.suspendCancellableCoroutine + LocalOnlyHotspotCallback.
+        // Return Triple(ssid, psk, network) or null on failure.
+        TODO("Wrap startLocalOnlyHotspot in a suspend function")
+    }
+}
+```
+
+(Note: leaving `startLoh` as TODO is acceptable here — Phase O Task 71 will write the production version. This is a throwaway prototype, the goal is just to confirm the API works on the device.)
+
+- [ ] **Step 3: On the laptop, run a tiny echo server**
+
+```bash
+# Python 3
+python3 -c "
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class E(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(n)
+        print(f'POST got {n} bytes: {body!r}')
+        self.send_response(200); self.end_headers(); self.wfile.write(b'OK')
+HTTPServer(('0.0.0.0', 8080), E).serve_forever()
+"
+```
+
+- [ ] **Step 4: Run the app on the S25+. Connect laptop to LOH network. Tap the button.**
+
+Expected: app shows `LOH ssid=AndroidShare_XXXX psk=AAAAAAAA code=200`. Laptop console prints the received bytes.
+
+- [ ] **Step 5: Document in `notes-results.md`**
+
+```markdown
+# Android LocalOnlyHotspot prototype — results
+
+**Date:** YYYY-MM-DD
+**Phone:** Samsung S25+ / Android 16 / One UI 8.X
+
+## API behavior
+- `startLocalOnlyHotspot()` returned: success / failed (reason: ...)
+- SSID format: AndroidShare_XXXX (record actual)
+- PSK length: N chars
+- LOH took N seconds to come up
+
+## OkHttp routing
+- With `socketFactory(network.socketFactory)`: routed to LOH? yes/no
+- Without binding: routed to LOH? yes/no  ← important for design decision
+- HTTP response code: 200
+
+## Verdict
+- ☐ PASS — proceed
+- ☐ FAIL — [describe]
+```
+
+- [ ] **Step 6: Commit prototype + notes**
+
+```bash
+git add prototypes/loh_android/ app/proto-loh/
+git commit -m "test: verify Android LOH + OkHttp routing on Samsung S25+"
+```
+
+(Note: the throwaway `app/proto-loh/` Android project is committed but Phase N replaces it. Optionally delete it post-Phase-N as cleanup.)
+
+---
+
+### Task 55: Phase L decision point
+
+**Files:**
+- Modify: `prototypes/ota_arduinoota/README.md` (if needed)
+- Modify: `prototypes/loh_android/notes-results.md` (if needed)
+- Create: `prototypes/v4x_decision.md`
+
+- [ ] **Step 1: Review both prototype results**
+
+Both Tasks 53 and 54 produce verdicts. Aggregate:
+
+| Prototype | Verdict |
+|---|---|
+| Task 53 — JAndrassy on R4 + mDNS | PASS / FAIL |
+| Task 54 — Android LOH + OkHttp routing | PASS / FAIL |
+
+- [ ] **Step 2: Write decision doc**
+
+```markdown
+# Phase L decision point
+
+**Date:** YYYY-MM-DD
+
+## Outcomes
+- Task 53: [PASS/FAIL — summary]
+- Task 54: [PASS/FAIL — summary]
+
+## Decision
+- ☐ Proceed to Phase M (both prototypes passed; design holds)
+- ☐ Revise design (one or both failed; what changes)
+
+## Notes for Phase M+ implementation
+- [Anything learned in the prototypes that affects implementation choices]
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add prototypes/v4x_decision.md
+git commit -m "plan: Phase L decision point — proceed/revise"
+```
+
+If proceeding: continue to Phase M. If revising: stop, return to brainstorming with the failure data.
+
+---
+
+## Phase M: Firmware Maintenance Mode (Tasks 56-62)
+
+### Task 56: Add ArduinoOTA library to project + libraries.txt
+
+**Files:**
+- Modify: `libraries.txt`
+- Modify: `README.md` (libraries section)
+
+- [ ] **Step 1: Pin library version**
+
+Identify the latest stable JAndrassy/ArduinoOTA tag. Append to `libraries.txt`:
+
+```
+ArduinoOTA@1.x.y    # JAndrassy fork — supports R4 WiFi
+```
+
+(Substitute actual version from `arduino-cli lib list` output post-install.)
+
+- [ ] **Step 2: Update README**
+
+Add to the libraries section:
+
+```markdown
+- `ArduinoOTA@<ver>` — JAndrassy fork supporting R4 WiFi via `WiFiS3` and `InternalStorageRenesas`
+```
+
+- [ ] **Step 3: Verify clean compile**
+
+```bash
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+```
+
+Expected: existing build still passes (the include hasn't been added to the sketch yet, this is just confirming library install didn't break anything).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add libraries.txt README.md
+git commit -m "build: pin JAndrassy/ArduinoOTA library for v4.x"
+```
+
+---
+
+### Task 57: 🧪 Percent-decode helper + RX buffer enlargement
+
+**Files:**
+- Modify: `carduino-v4/ble_console.h` (raise `BLE_RX_BUFFER_SIZE`)
+- Modify: `carduino-v4/ble_console.cpp` (apply new size)
+- Create: `carduino-v4/util/pct_decode.h`
+- Create: `carduino-v4/util/pct_decode.cpp`
+- Create: `tests/test_pct_decode.cpp`
+- Modify: `tests/run-tests.sh` (add new test)
+
+- [ ] **Step 1: Write failing test**
+
+```cpp
+// tests/test_pct_decode.cpp
+#include "../carduino-v4/util/pct_decode.h"
+#include <cassert>
+#include <cstring>
+
+int main() {
+    char out[64];
+    size_t n;
+
+    // Plain ASCII unchanged
+    assert(pct_decode("hello", out, sizeof(out), &n));
+    assert(n == 5 && memcmp(out, "hello", 5) == 0);
+
+    // Single percent escape
+    assert(pct_decode("a%20b", out, sizeof(out), &n));
+    assert(n == 3 && memcmp(out, "a b", 3) == 0);
+
+    // Multiple escapes
+    assert(pct_decode("%21%40%23", out, sizeof(out), &n));
+    assert(n == 3 && memcmp(out, "!@#", 3) == 0);
+
+    // Reject malformed (non-hex digit)
+    assert(!pct_decode("a%2Gb", out, sizeof(out), &n));
+
+    // Reject incomplete escape at end
+    assert(!pct_decode("foo%2", out, sizeof(out), &n));
+
+    // Reject overflow
+    char small[3];
+    assert(!pct_decode("longer", small, sizeof(small), &n));
+
+    return 0;
+}
+```
+
+- [ ] **Step 2: Run test — should fail to link**
+
+```bash
+"C:/Program Files/Git/bin/bash.exe" tests/run-tests.sh
+```
+Expected: linker error, `pct_decode` undefined.
+
+- [ ] **Step 3: Implement helper**
+
+```cpp
+// carduino-v4/util/pct_decode.h
+#pragma once
+#include <stddef.h>
+
+bool pct_decode(const char* in, char* out, size_t out_capacity, size_t* out_len);
+```
+
+```cpp
+// carduino-v4/util/pct_decode.cpp
+#include "pct_decode.h"
+
+static int hex_nibble(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+bool pct_decode(const char* in, char* out, size_t cap, size_t* out_len) {
+    size_t i = 0, j = 0;
+    while (in[i]) {
+        if (j >= cap) return false;
+        if (in[i] == '%') {
+            int hi = hex_nibble(in[i+1]);
+            int lo = (hi >= 0) ? hex_nibble(in[i+2]) : -1;
+            if (hi < 0 || lo < 0) return false;
+            out[j++] = (char)((hi << 4) | lo);
+            i += 3;
+        } else {
+            out[j++] = in[i++];
+        }
+    }
+    *out_len = j;
+    return true;
+}
+```
+
+- [ ] **Step 4: Add to test runner**
+
+In `tests/run-tests.sh`, append:
+```bash
+g++ -std=c++17 -o tests/test_pct_decode \
+    tests/test_pct_decode.cpp \
+    carduino-v4/util/pct_decode.cpp
+./tests/test_pct_decode && echo "[PASS] pct_decode"
+```
+
+- [ ] **Step 5: Run tests**
+
+```bash
+"C:/Program Files/Git/bin/bash.exe" tests/run-tests.sh
+```
+Expected: all previous tests still pass + `[PASS] pct_decode`.
+
+- [ ] **Step 6: Bump RX buffer in ble_console.h**
+
+Locate the existing `#define BLE_RX_BUFFER_SIZE 64` (or similar) and change:
+```c
+#define BLE_RX_BUFFER_SIZE 256
+```
+
+Comment-block the rationale:
+```c
+// Bumped from 64 -> 256 in v4.x to fit `maintenance ssid=<pct> psk=<pct> pwd=<pct>\n`
+// where percent-encoded SSID + PSK + OTA pwd can total ~150 bytes worst case.
+// See V4X-DESIGN.md §5.1.
+```
+
+- [ ] **Step 7: Verify firmware compile**
+
+```bash
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+```
+Expected: clean compile. Note the new RAM/flash usage.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add carduino-v4/util/ carduino-v4/ble_console.h tests/test_pct_decode.cpp tests/run-tests.sh
+git commit -m "feat: percent-decode helper + 256B BLE RX buffer for maintenance command"
+```
+
+---
+
+### Task 58: New BLE commands — `maintenance ...` and `maintenance abort`
+
+**Files:**
+- Create: `carduino-v4/maintenance_mode.h`
+- Create: `carduino-v4/maintenance_mode.cpp` (skeleton — full state machine in Task 61)
+- Modify: `carduino-v4/ble_console.cpp` (parse + dispatch)
+- Create: `tests/test_maintenance_args.cpp` (parser tests)
+
+- [ ] **Step 1: Define `MaintenanceArgs` and request API**
+
+```c
+// carduino-v4/maintenance_mode.h
+#pragma once
+#include <stddef.h>
+#include <stdint.h>
+
+struct MaintenanceArgs {
+    char ssid[33];   // null-terminated, max 32 ASCII chars (Wi-Fi standard)
+    char psk[64];    // null-terminated, max 63 ASCII chars (WPA2 standard)
+    char ota_pwd[33]; // null-terminated, max 32 chars
+};
+
+enum class MaintenanceParseResult : uint8_t {
+    OK,
+    BAD_ARGS,
+    ARG_TOO_LONG,
+};
+
+// Parse a "maintenance ssid=<pct> psk=<pct> pwd=<pct>" line into args.
+// Returns OK on success. Caller passes already-trimmed line (no leading/trailing whitespace,
+// no newline). On any error, args contents are unspecified.
+MaintenanceParseResult maintenance_parse_args(const char* line, MaintenanceArgs& out);
+
+// State machine API (state machine impl in Task 61)
+bool maintenance_request_enter(const MaintenanceArgs& args);  // returns false if busy
+void maintenance_request_abort();
+void maintenance_tick(uint32_t now_ms);  // called from main loop
+bool maintenance_is_active();
+```
+
+- [ ] **Step 2: Write parser tests**
+
+```cpp
+// tests/test_maintenance_args.cpp
+#include "../carduino-v4/maintenance_mode.h"
+#include <cassert>
+#include <cstring>
+
+int main() {
+    MaintenanceArgs args;
+
+    // Happy path
+    auto r = maintenance_parse_args("ssid=MEES psk=hunter2 pwd=otapwx", args);
+    assert(r == MaintenanceParseResult::OK);
+    assert(strcmp(args.ssid, "MEES") == 0);
+    assert(strcmp(args.psk, "hunter2") == 0);
+    assert(strcmp(args.ota_pwd, "otapwx") == 0);
+
+    // Percent-encoded SSID with space
+    r = maintenance_parse_args("ssid=My%20Phone psk=p psk_no_pwd", args);
+    // Missing pwd= entirely
+    assert(r == MaintenanceParseResult::BAD_ARGS);
+
+    r = maintenance_parse_args("ssid=My%20Phone psk=p1 pwd=p2", args);
+    assert(r == MaintenanceParseResult::OK);
+    assert(strcmp(args.ssid, "My Phone") == 0);
+
+    // Wrong order is OK (parsed by key)
+    r = maintenance_parse_args("pwd=a psk=b ssid=c", args);
+    assert(r == MaintenanceParseResult::OK);
+    assert(strcmp(args.ssid, "c") == 0 && strcmp(args.psk, "b") == 0 && strcmp(args.ota_pwd, "a") == 0);
+
+    // Too long SSID (>32 chars)
+    char long_ssid[120];
+    memset(long_ssid, 'A', sizeof(long_ssid)-1); long_ssid[sizeof(long_ssid)-1] = 0;
+    char buf[200];
+    snprintf(buf, sizeof(buf), "ssid=%s psk=p pwd=q", long_ssid);
+    r = maintenance_parse_args(buf, args);
+    assert(r == MaintenanceParseResult::ARG_TOO_LONG);
+
+    // Empty value
+    r = maintenance_parse_args("ssid= psk=p pwd=q", args);
+    assert(r == MaintenanceParseResult::BAD_ARGS);
+
+    // Malformed percent escape
+    r = maintenance_parse_args("ssid=a%2G psk=p pwd=q", args);
+    assert(r == MaintenanceParseResult::BAD_ARGS);
+
+    return 0;
+}
+```
+
+- [ ] **Step 3: Run test — should fail**
+
+```bash
+"C:/Program Files/Git/bin/bash.exe" tests/run-tests.sh
+```
+Expected: link error, `maintenance_parse_args` undefined.
+
+- [ ] **Step 4: Implement parser in `maintenance_mode.cpp`**
+
+```cpp
+#include "maintenance_mode.h"
+#include "util/pct_decode.h"
+#include <string.h>
+#include <stdlib.h>
+
+// Parse "key=value key=value ..." style. Returns OK only if all three of
+// ssid, psk, pwd are present, decode cleanly, and fit their buffers.
+MaintenanceParseResult maintenance_parse_args(const char* line, MaintenanceArgs& out) {
+    out.ssid[0] = out.psk[0] = out.ota_pwd[0] = 0;
+
+    const char* p = line;
+    while (*p) {
+        // Find '='
+        const char* eq = strchr(p, '=');
+        if (!eq) return MaintenanceParseResult::BAD_ARGS;
+        size_t key_len = eq - p;
+
+        // Find end of value (next space or end)
+        const char* val = eq + 1;
+        const char* val_end = val;
+        while (*val_end && *val_end != ' ') val_end++;
+        size_t val_len = val_end - val;
+        if (val_len == 0) return MaintenanceParseResult::BAD_ARGS;
+
+        // Copy key into a small local buffer
+        char key[8];
+        if (key_len >= sizeof(key)) return MaintenanceParseResult::BAD_ARGS;
+        memcpy(key, p, key_len); key[key_len] = 0;
+
+        // Copy value into a percent-encoded local buffer
+        char enc[200];
+        if (val_len >= sizeof(enc)) return MaintenanceParseResult::ARG_TOO_LONG;
+        memcpy(enc, val, val_len); enc[val_len] = 0;
+
+        // Pick destination
+        char* dest = nullptr;
+        size_t dest_cap = 0;
+        if (strcmp(key, "ssid") == 0) { dest = out.ssid; dest_cap = sizeof(out.ssid); }
+        else if (strcmp(key, "psk") == 0) { dest = out.psk; dest_cap = sizeof(out.psk); }
+        else if (strcmp(key, "pwd") == 0) { dest = out.ota_pwd; dest_cap = sizeof(out.ota_pwd); }
+        else return MaintenanceParseResult::BAD_ARGS;
+
+        size_t decoded_len = 0;
+        if (!pct_decode(enc, dest, dest_cap - 1, &decoded_len)) {
+            // Distinguish overflow from malformed
+            if (val_len >= dest_cap) return MaintenanceParseResult::ARG_TOO_LONG;
+            return MaintenanceParseResult::BAD_ARGS;
+        }
+        dest[decoded_len] = 0;
+        if (decoded_len == 0) return MaintenanceParseResult::BAD_ARGS;
+
+        p = val_end;
+        while (*p == ' ') p++;
+    }
+
+    if (out.ssid[0] == 0 || out.psk[0] == 0 || out.ota_pwd[0] == 0)
+        return MaintenanceParseResult::BAD_ARGS;
+    return MaintenanceParseResult::OK;
+}
+
+// Stubs — full impl in Task 61
+bool maintenance_request_enter(const MaintenanceArgs&) { return false; }
+void maintenance_request_abort() {}
+void maintenance_tick(uint32_t) {}
+bool maintenance_is_active() { return false; }
+```
+
+- [ ] **Step 5: Wire into BLE command dispatcher**
+
+In `ble_console.cpp`'s command-handler switch (or chain), add:
+
+```c
+if (strncmp(cmd, "maintenance abort", 17) == 0) {
+    maintenance_request_abort();
+    ble_send_line("OK maintenance aborted");
+    return;
+}
+if (strncmp(cmd, "maintenance ", 12) == 0) {
+    MaintenanceArgs args;
+    auto r = maintenance_parse_args(cmd + 12, args);
+    switch (r) {
+        case MaintenanceParseResult::ARG_TOO_LONG:
+            ble_send_line("ERR maintenance arg-too-long");
+            return;
+        case MaintenanceParseResult::BAD_ARGS:
+            ble_send_line("ERR maintenance bad-args");
+            return;
+        case MaintenanceParseResult::OK:
+            if (!maintenance_request_enter(args)) {
+                ble_send_line("ERR maintenance busy");
+                return;
+            }
+            ble_send_line("OK maintenance armed timeout=3000");
+            return;
+    }
+}
+```
+
+- [ ] **Step 6: Run tests + compile firmware**
+
+```bash
+"C:/Program Files/Git/bin/bash.exe" tests/run-tests.sh
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+```
+Expected: all tests pass; firmware compiles. Sketch size grows by ~1-2 KB.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add carduino-v4/maintenance_mode.{h,cpp} carduino-v4/ble_console.cpp tests/test_maintenance_args.cpp tests/run-tests.sh
+git commit -m "feat: maintenance command parsing + BLE dispatch (state machine stubbed)"
+```
+
+---
+
+### Task 59: Banner version token
+
+**Files:**
+- Modify: `carduino-v4/config.h` (add `FIRMWARE_VERSION`, `FIRMWARE_BUILD`)
+- Modify: `carduino-v4/ble_console.cpp` (extend connect-time banner)
+
+- [ ] **Step 1: Add version constants to config.h**
+
+```c
+// In config.h, near top with other version-y constants:
+#define FIRMWARE_VERSION "4.1.0"
+#define FIRMWARE_BUILD   STR(GIT_SHORT_SHA)  // injected at compile time, see Step 2
+```
+
+- [ ] **Step 2: Inject git short SHA at compile time**
+
+Create a build hook to set `GIT_SHORT_SHA` from `git rev-parse --short HEAD`. Simplest path: write a tiny `gen_build_id.sh` and add a one-line README note for Matthew to run before each compile, OR use `arduino-cli`'s `--build-property` flag:
+
+```bash
+GIT_SHA=$(git rev-parse --short HEAD)
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
+    --fqbn arduino:renesas_uno:unor4wifi \
+    --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
+    carduino-v4/
+```
+
+Document this build invocation in `README.md` (section "Build with version stamp").
+
+- [ ] **Step 3: Add helper macro to expand the SHA cleanly**
+
+```c
+// In config.h
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+```
+
+- [ ] **Step 4: Modify connect banner**
+
+In `ble_console.cpp`, locate the banner-on-connect routine (Task 29's code). Prepend a new first line:
+
+```c
+ble_send_line("CARDUINO-v4 version=" FIRMWARE_VERSION " build=" FIRMWARE_BUILD);
+```
+
+The existing reset/boot/last_err line stays as the second line.
+
+- [ ] **Step 5: Verify compile and bench-test banner**
+
+```bash
+GIT_SHA=$(git rev-parse --short HEAD)
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
+    --fqbn arduino:renesas_uno:unor4wifi \
+    --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
+    carduino-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" upload \
+    --fqbn arduino:renesas_uno:unor4wifi --port COM8 carduino-v4/
+```
+
+Connect via `Serial Bluetooth Terminal`. First line on connect should be:
+```
+CARDUINO-v4 version=4.1.0 build=4659186
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add carduino-v4/config.h carduino-v4/ble_console.cpp README.md
+git commit -m "feat: firmware version token in BLE connect banner"
+```
+
+---
+
+### Task 60: Final CAN status frame on maintenance entry
+
+**Files:**
+- Modify: `carduino-v4/can_protocol.h` (expose a "send single frame with custom flags" helper if not present)
+- Modify: `carduino-v4/can_protocol.cpp`
+- Modify: `carduino-v4/maintenance_mode.cpp` (call from MM_ARMED entry)
+
+- [ ] **Step 1: Add helper to set the OTA-in-progress bit and flush one CAN frame**
+
+In `can_protocol.h`:
+```c
+// Sends one final frame 0x402 with bit 2 of the system_status byte set.
+// Used at maintenance entry so MS3-side logs show a clean "going down" marker.
+void can_send_maintenance_marker();
+```
+
+In `can_protocol.cpp`:
+```c
+void can_send_maintenance_marker() {
+    // Build a frame 2 with the existing seq + health + ages, but with system_status bit 2 set.
+    // Re-use whatever the normal CanSendPhase builds, then OR in the bit before tx.
+    Frame2 f = build_frame_2_now();   // existing helper, refactor if needed
+    f.system_status |= (1 << 2);      // OTA_IN_PROGRESS
+    can_tx_frame_now(0x402, (uint8_t*)&f, sizeof(f));
+}
+```
+
+- [ ] **Step 2: Call from `maintenance_request_enter`**
+
+In `maintenance_mode.cpp`, in the MM_ARMED entry action (state machine details land in Task 61, but the marker call is independent):
+
+```c
+void enter_armed_state() {
+    can_send_maintenance_marker();  // one final marker frame
+    // ... rest of MM_ARMED entry: stop dumps, set LED, ...
+}
+```
+
+(For now this can sit in a stub function called from `maintenance_request_enter` until Task 61 wires it into the real state machine.)
+
+- [ ] **Step 3: Bench-verify with USB-CAN dongle**
+
+Flash. Trigger maintenance via BLE (`maintenance ssid=test psk=test pwd=test`). Watch CAN dongle. Expected: one frame 0x402 arrives with `system_status` byte showing bit 2 set, then no further 0x401/0x402 frames until reboot.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add carduino-v4/can_protocol.{h,cpp} carduino-v4/maintenance_mode.cpp
+git commit -m "feat: send final CAN status frame with OTA bit set on maintenance entry"
+```
+
+---
+
+### Task 61: Maintenance state machine
+
+**Files:**
+- Modify: `carduino-v4/maintenance_mode.cpp` (real state machine, replacing stubs)
+- Modify: `carduino-v4/maintenance_mode.h` (state enum if exposed for tests)
+- Modify: `carduino-v4/carduino-v4.ino` (call `maintenance_tick(now)` each loop)
+
+- [ ] **Step 1: Define states**
+
+In `maintenance_mode.cpp` (private):
+
+```c
+enum class MMState : uint8_t {
+    NORMAL,
+    ARMED,
+    BLE_DRAIN,
+    WIFI_JOINING,
+    OTA_READY,
+    UPLOAD_APPLYING,
+    OTA_ERROR,
+    ABORTING,
+};
+
+static MMState s_state = MMState::NORMAL;
+static uint32_t s_state_entered_ms = 0;
+static MaintenanceArgs s_args;
+```
+
+- [ ] **Step 2: Implement entry/exit/transitions**
+
+```c
+#include <ArduinoOTA.h>
+#include <WiFiS3.h>
+#include "ble_console.h"   // for ble_end()
+#include "display_matrix.h" // for LED patterns
+
+static void transition_to(MMState s, uint32_t now) {
+    s_state = s;
+    s_state_entered_ms = now;
+
+    switch (s) {
+        case MMState::ARMED:
+            can_send_maintenance_marker();
+            ble_stop_periodic_dumps();
+            display_set_pattern(DISPLAY_MAINT_PENDING);
+            break;
+        case MMState::BLE_DRAIN:
+            // No new TX. Just wait the drain window.
+            break;
+        case MMState::WIFI_JOINING:
+            ble_end();
+            WiFi.begin(s_args.ssid, s_args.psk);
+            break;
+        case MMState::OTA_READY:
+            ArduinoOTA.begin(WiFi.localIP(), "carduino-v4", s_args.ota_pwd, InternalStorage);
+            display_set_pattern(DISPLAY_MAINT_READY);
+            break;
+        case MMState::UPLOAD_APPLYING:
+            display_set_pattern(DISPLAY_MAINT_APPLYING);
+            break;
+        case MMState::OTA_ERROR:
+            display_set_pattern(DISPLAY_MAINT_ERROR);
+            WiFi.disconnect();
+            break;
+        case MMState::ABORTING:
+            display_set_pattern(DISPLAY_NORMAL);
+            // BLE may still be up here — caller already replied "OK maintenance aborted"
+            break;
+        case MMState::NORMAL:
+            // Reached only via reboot. Not entered via state transition (NVIC reset).
+            break;
+    }
+}
+
+bool maintenance_request_enter(const MaintenanceArgs& args) {
+    if (s_state != MMState::NORMAL) return false;
+    s_args = args;
+    transition_to(MMState::ARMED, millis());
+    return true;
+}
+
+void maintenance_request_abort() {
+    if (s_state == MMState::ARMED) {
+        transition_to(MMState::ABORTING, millis());
+    }
+    // Otherwise silently ignore — we already past the BLE-up window.
+}
+
+bool maintenance_is_active() {
+    return s_state != MMState::NORMAL;
+}
+
+void maintenance_tick(uint32_t now) {
+    uint32_t elapsed = now - s_state_entered_ms;
+
+    switch (s_state) {
+        case MMState::NORMAL:
+            return;
+
+        case MMState::ARMED:
+            if (elapsed >= 3000) transition_to(MMState::BLE_DRAIN, now);
+            else if (elapsed >= 10000) transition_to(MMState::ABORTING, now); // hard cap
+            return;
+
+        case MMState::BLE_DRAIN:
+            if (elapsed >= 1000) transition_to(MMState::WIFI_JOINING, now);
+            return;
+
+        case MMState::WIFI_JOINING:
+            if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != INADDR_NONE) {
+                transition_to(MMState::OTA_READY, now);
+            } else if (elapsed >= 30000) {
+                NVIC_SystemReset();   // 30s join deadline — recover by reboot
+            }
+            return;
+
+        case MMState::OTA_READY:
+            ArduinoOTA.poll();
+            // onStart callback transitions to UPLOAD_APPLYING via a separate handler
+            if (elapsed >= 5UL * 60 * 1000) {
+                NVIC_SystemReset();   // 5 min idle — reboot to NORMAL
+            }
+            return;
+
+        case MMState::UPLOAD_APPLYING:
+            ArduinoOTA.poll();
+            // Library will apply() and NVIC_SystemReset() on success.
+            // Hardware watchdog catches stuck cases.
+            return;
+
+        case MMState::OTA_ERROR:
+            if (elapsed >= 5000) NVIC_SystemReset();
+            return;
+
+        case MMState::ABORTING:
+            // Single-tick exit
+            transition_to(MMState::NORMAL, now);
+            return;
+    }
+}
+```
+
+- [ ] **Step 3a: Verify the JAndrassy callback API shape**
+
+Before writing the callback code below, **read the actual library headers** to confirm the registration mechanism. The library has shipped at least two patterns historically: direct field assignment vs. setter methods. Either pattern works equivalently; we just need to use the right syntax.
+
+```bash
+# JAndrassy library files cached in Task 53; if not present:
+ls $(arduino-cli config dump | grep user)/libraries/ArduinoOTA/src/WiFiOTA.h
+```
+
+Look for the public surface: do `onStartCallback`, `onErrorCallback`, `beforeApplyCallback` appear as `public:` fields (assignable directly), or as `void setOnStartCallback(...)` setters? Note also the exact callback signature — some versions take `void()`, others may take additional context args.
+
+Record findings inline at the top of `maintenance_mode.cpp`:
+```c
+// JAndrassy/ArduinoOTA callback API (as of <commit/version>):
+//   - <FIELD or SETTER>: <exact signature>
+```
+
+- [ ] **Step 3b: Wire ArduinoOTA callbacks to transition state**
+
+Use whichever syntax matches the library version. Both forms shown for reference:
+
+```c
+// If callbacks are public fields (older API):
+ArduinoOTA.onStartCallback = []() {
+    transition_to(MMState::UPLOAD_APPLYING, millis());
+};
+ArduinoOTA.onErrorCallback = [](int code, const char* status) {
+    transition_to(MMState::OTA_ERROR, millis());
+};
+
+// If callbacks are setters (newer API):
+// ArduinoOTA.setOnStartCallback([]() { ... });
+// ArduinoOTA.setOnErrorCallback([](int, const char*) { ... });
+```
+
+The wiring happens once at `MM_OTA_READY` entry (or earlier — they're idempotent registration calls).
+
+- [ ] **Step 4: Call `maintenance_tick(millis())` from main loop**
+
+In `carduino-v4.ino`'s `loop()`:
+
+```c
+void loop() {
+  uint32_t now = millis();
+  // ... existing scheduler entries ...
+  maintenance_tick(now);
+}
+```
+
+If maintenance is active, the existing sensor/CAN/BLE phases should be gated to skip work — gate them on `!maintenance_is_active()`.
+
+- [ ] **Step 5: Compile + bench test happy path**
+
+```bash
+GIT_SHA=$(git rev-parse --short HEAD)
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
+    --fqbn arduino:renesas_uno:unor4wifi \
+    --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
+    carduino-v4/
+```
+
+Flash via USB. Connect BLE. Send `maintenance ssid=MEES psk=<actual> pwd=otatest`. Expected:
+
+1. Reply `OK maintenance armed timeout=3000`
+2. ~3 sec later, BLE drops
+3. Within ~30 sec, CARDUINO mDNS service appears on hotspot
+
+Verify mDNS via `dns-sd -B _arduino._tcp local.` from a laptop on the hotspot.
+
+- [ ] **Step 6: Bench test abort path**
+
+Send `maintenance ssid=MEES psk=<actual> pwd=otatest`, then within 3 sec send `maintenance abort`. Expected: `OK maintenance aborted` reply, BLE stays up, no WiFi join attempted.
+
+- [ ] **Step 7: Bench test happy-path full OTA**
+
+After Step 5 succeeds, push a test sketch via curl from a laptop on the hotspot (same procedure as Task 53 Step 6). Expected: 200 OK, device reboots, comes back on BLE with the test-sketch behavior. Re-flash production firmware via USB to recover.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add carduino-v4/maintenance_mode.{h,cpp} carduino-v4/carduino-v4.ino
+git commit -m "feat: maintenance state machine with per-state timeouts and ArduinoOTA integration"
+```
+
+---
+
+### Task 62: LED matrix maintenance patterns
+
+**Files:**
+- Modify: `carduino-v4/display_matrix.{h,cpp}`
+
+**What this does:** fills in the four maintenance LED patterns currently stubbed in `DESIGN.md` §6.5.
+
+- [ ] **Step 1: Define new pattern enums**
+
+In `display_matrix.h`:
+```c
+enum DisplayPattern {
+    // ... existing patterns ...
+    DISPLAY_MAINT_PENDING,    // device armed, BLE up
+    DISPLAY_MAINT_READY,      // WiFi up, listening for OTA
+    DISPLAY_MAINT_APPLYING,   // upload in progress
+    DISPLAY_MAINT_ERROR,      // OTA failed
+};
+```
+
+- [ ] **Step 2: Implement patterns in `display_matrix.cpp`**
+
+```c
+// Pending: slow blink top-left corner
+static void render_maint_pending(uint32_t now) {
+    matrix.clear();
+    if ((now / 500) & 1) matrix.set_pixel(0, 0, true);
+    matrix.show();
+}
+
+// Ready: solid top row
+static void render_maint_ready(uint32_t) {
+    matrix.clear();
+    for (int x = 0; x < 12; x++) matrix.set_pixel(x, 0, true);
+    matrix.show();
+}
+
+// Applying: top row slow chase
+static void render_maint_applying(uint32_t now) {
+    matrix.clear();
+    int x = (now / 100) % 12;
+    matrix.set_pixel(x, 0, true);
+    matrix.show();
+}
+
+// Error: solid X
+static void render_maint_error(uint32_t) {
+    matrix.clear();
+    for (int i = 0; i < 8; i++) {
+        matrix.set_pixel(i + 2, i, true);     // \ diagonal
+        matrix.set_pixel(9 - i, i, true);     // / diagonal
+    }
+    matrix.show();
+}
+```
+
+Add cases in the main render dispatcher.
+
+- [ ] **Step 3: Bench-verify each pattern**
+
+Flash. Trigger each state via the maintenance flow. Expected: each pattern is visually distinct and unmistakable for a normal-mode pattern.
+
+- [ ] **Step 4: Final firmware sketch-size check (Phase M gate)**
+
+Per V4X-DESIGN.md §5.6, the v4 baseline is 104,880 bytes / ~128 KB max sketch region with ~13 KB headroom. Phase M added ArduinoOTA + InternalStorageRenesas + state machine + new BLE commands + LED patterns + version banner. Verify total fits.
+
+```bash
+GIT_SHA=$(git rev-parse --short HEAD)
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
+    --fqbn arduino:renesas_uno:unor4wifi \
+    --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
+    carduino-v4/
+```
+
+Record program-storage and dynamic-memory percentages. **Hard stop if program storage > 49% (which would cross the half-flash apply boundary).**
+
+If overflow: candidates to cut/compress, in order of preference:
+1. Drop the `verbose` BLE command and its handler (rarely used)
+2. Compact debug strings in `self_tests.cpp`
+3. Defer LED maintenance patterns (Task 62 itself) to v4.y polish
+4. Strip the `boot` command's pretty-printed output to a one-line dump
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add carduino-v4/display_matrix.{h,cpp}
+git commit -m "feat: LED matrix patterns for maintenance pending/ready/applying/error + final size check"
+```
+
+---
+
+## Phase N: Android App Foundation (Tasks 63-69)
+
+### Task 63: Android Studio project + Compose scaffolding
+
+**Files:**
+- Create: `app/` directory (Android Studio project)
+- Create: `app/build.gradle.kts`, `app/src/main/AndroidManifest.xml`
+- Create: `app/src/main/java/works/mees/carduino/MainActivity.kt`
+- Create: `app/.gitignore` (Android-standard)
+
+- [ ] **Step 1: Generate project**
+
+In Android Studio: New Project → Empty Activity (Compose). Settings:
+- Application name: `Carduino`
+- Package: `works.mees.carduino`
+- Min SDK: 26 (Android 8.0 — needed for `LocalOnlyHotspot`)
+- Target SDK: 35 (Android 16)
+- Build configuration: Kotlin DSL
+- Save location: `E:\claude\personal\miata\projects\carduino-v4\app`
+
+- [ ] **Step 2: Add core dependencies**
+
+In `app/build.gradle.kts` (Module: app):
+
+```kotlin
+dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
+    implementation(composeBom)
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.navigation:navigation-compose:2.8.4")
+
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+}
+```
+
+- [ ] **Step 3: Add manifest permissions**
+
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+<uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+- [ ] **Step 4: Add a runtime-permission gate**
+
+Manifest declarations are necessary but not sufficient. On Android 12+ (`BLUETOOTH_SCAN/CONNECT`, `NEARBY_WIFI_DEVICES`) and Android 6+ (`ACCESS_FINE_LOCATION`), permissions need runtime grant. Block app entry on these.
+
+Create `app/src/main/java/works/mees/carduino/PermissionsGate.kt`:
+
+```kotlin
+package works.mees.carduino
+
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+private val requiredPerms = buildList {
+    if (Build.VERSION.SDK_INT >= 31) {
+        add(Manifest.permission.BLUETOOTH_SCAN)
+        add(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+    if (Build.VERSION.SDK_INT >= 33) {
+        add(Manifest.permission.NEARBY_WIFI_DEVICES)
+    }
+    add(Manifest.permission.ACCESS_FINE_LOCATION)
+}.toTypedArray()
+
+@Composable
+fun PermissionsGate(content: @Composable () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var granted by remember {
+        mutableStateOf(requiredPerms.all {
+            androidx.core.content.ContextCompat.checkSelfPermission(ctx, it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        })
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        granted = result.values.all { it }
+    }
+    if (granted) {
+        content()
+    } else {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(24.dp)) {
+                Text("Carduino needs Bluetooth, location, and nearby-devices permissions to scan for and talk to the device.", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { launcher.launch(requiredPerms) }) { Text("Grant permissions") }
+            }
+        }
+    }
+}
+```
+
+Wrap `MainActivity`'s root composable in `PermissionsGate { ... }`.
+
+- [ ] **Step 5: Verify clean build**
+
+```bash
+cd app
+./gradlew assembleDebug
+```
+
+Expected: APK at `app/build/outputs/apk/debug/app-debug.apk`. Install on the S25+ via `./gradlew installDebug`, launch, see the permission-grant screen, tap Grant, see the empty Compose content (no crash).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/
+git commit -m "feat: bootstrap Android Studio project with Compose, deps, and runtime permissions gate"
+```
+
+---
+
+### Task 64: BLE central — scan, connect, NUS service discovery
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ble/CarduinoBleClient.kt`
+- Create: `app/src/main/java/works/mees/carduino/ble/NusUuids.kt`
+
+- [ ] **Step 1: NUS UUIDs**
+
+```kotlin
+// app/src/main/java/works/mees/carduino/ble/NusUuids.kt
+package works.mees.carduino.ble
+
+import java.util.UUID
+
+object NusUuids {
+    val SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
+    val TX:      UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E") // notify (device → app)
+    val RX:      UUID = UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E") // write  (app → device)
+    val CCCD:    UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+}
+```
+
+- [ ] **Step 2: Client wrapping `BluetoothGatt`**
+
+```kotlin
+// CarduinoBleClient.kt
+package works.mees.carduino.ble
+
+import android.bluetooth.*
+import android.content.Context
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
+
+sealed class BleState {
+    object Idle : BleState()
+    data class Connecting(val mac: String) : BleState()
+    data class Connected(val mac: String) : BleState()
+    data class Failed(val reason: String) : BleState()
+}
+
+class CarduinoBleClient(private val ctx: Context) {
+    private var gatt: BluetoothGatt? = null
+    private var rxChar: BluetoothGattCharacteristic? = null
+
+    private val _state = MutableStateFlow<BleState>(BleState.Idle)
+    val state: StateFlow<BleState> = _state.asStateFlow()
+
+    private val _lines = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val lines: SharedFlow<String> = _lines.asSharedFlow()
+
+    private val lineBuf = StringBuilder()
+
+    fun connect(mac: String) {
+        _state.value = BleState.Connecting(mac)
+        val device = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
+            .adapter.getRemoteDevice(mac)
+        gatt = device.connectGatt(ctx, /*autoConnect=*/false, callback)
+    }
+
+    fun disconnect() {
+        gatt?.disconnect()
+    }
+
+    // BLE writes are async — each writeCharacteristic call must wait for onCharacteristicWrite
+    // before issuing the next, otherwise chunks can be silently dropped (especially on Samsung).
+    private val writeCompletion = java.util.concurrent.LinkedBlockingQueue<Int>(1)
+    private var negotiatedMtu = 23  // BLE 4.x default; updated via onMtuChanged
+
+    suspend fun writeLine(text: String): Boolean = withContext(Dispatchers.IO) {
+        val char = rxChar ?: return@withContext false
+        val bytes = (text + "\n").toByteArray(Charsets.UTF_8)
+        val payload = (negotiatedMtu - 3).coerceAtLeast(20)  // ATT overhead is 3 bytes
+
+        var sent = 0
+        while (sent < bytes.size) {
+            val end = minOf(sent + payload, bytes.size)
+            writeCompletion.clear()
+            char.value = bytes.copyOfRange(sent, end)
+            char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            if (gatt?.writeCharacteristic(char) != true) return@withContext false
+            // Wait for onCharacteristicWrite (max 2 sec per chunk)
+            val status = writeCompletion.poll(2, java.util.concurrent.TimeUnit.SECONDS)
+                ?: return@withContext false
+            if (status != BluetoothGatt.GATT_SUCCESS) return@withContext false
+            sent = end
+        }
+        true
+    }
+
+    // Add to BluetoothGattCallback inside CarduinoBleClient:
+    //   override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+    //       if (status == BluetoothGatt.GATT_SUCCESS) negotiatedMtu = mtu
+    //   }
+    //   override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
+    //       writeCompletion.offer(status)
+    //   }
+    // Also: after onServicesDiscovered, request a larger MTU:
+    //   gatt.requestMtu(247)
+
+    private val callback = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                g.discoverServices()
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                _state.value = BleState.Idle
+                rxChar = null
+            }
+        }
+        override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+            val service = g.getService(NusUuids.SERVICE) ?: run {
+                _state.value = BleState.Failed("NUS service not found")
+                return
+            }
+            rxChar = service.getCharacteristic(NusUuids.RX)
+            val tx = service.getCharacteristic(NusUuids.TX) ?: return
+
+            g.setCharacteristicNotification(tx, true)
+            val cccd = tx.getDescriptor(NusUuids.CCCD)
+            cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            g.writeDescriptor(cccd)
+
+            // Request larger MTU before signaling Connected — gives Step 2's writeLine room
+            g.requestMtu(247)
+            _state.value = BleState.Connected(g.device.address)
+        }
+        override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) negotiatedMtu = mtu
+        }
+        override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
+            writeCompletion.offer(status)
+        }
+        override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic) {
+            if (c.uuid == NusUuids.TX) {
+                val s = c.value.toString(Charsets.UTF_8)
+                lineBuf.append(s)
+                while (true) {
+                    val nl = lineBuf.indexOf('\n')
+                    if (nl < 0) break
+                    val line = lineBuf.substring(0, nl).trimEnd('\r')
+                    lineBuf.delete(0, nl + 1)
+                    _lines.tryEmit(line)
+                }
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 3: Manual smoke test**
+
+Add a tiny activity button that calls `connect("XX:XX:XX:XX:XX:XX")` with the actual Carduino MAC, hooks the `lines` flow into a Compose `LazyColumn`. Run on S25+, confirm the device's periodic dump arrives line-by-line.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ble/
+git commit -m "feat: BLE central wrapping NUS service for Carduino comms"
+```
+
+---
+
+### Task 65: Periodic-dump parser
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ble/DumpParser.kt`
+- Create: `app/src/test/java/works/mees/carduino/ble/DumpParserTest.kt`
+
+- [ ] **Step 1: Define parsed model**
+
+```kotlin
+// DumpParser.kt
+package works.mees.carduino.ble
+
+data class SensorReading(
+    val name: String,
+    val value: Double,
+    val unit: String,
+    val healthOk: Boolean,
+)
+
+data class DumpFrame(
+    val seq: Int,
+    val ready: Boolean,
+    val healthBitmask: Int,
+    val readings: Map<String, SensorReading>,
+)
+```
+
+- [ ] **Step 2: Failing test**
+
+```kotlin
+// DumpParserTest.kt
+package works.mees.carduino.ble
+
+import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
+
+class DumpParserTest {
+    @Test
+    fun parsesHappyPath() {
+        val lines = listOf(
+            "[seq=142 ready=1 health=0x1F]",
+            "  oilT  =  185.2 °F   ok",
+            "  oilP  =   58.4 PSI  ok",
+            "  fuelP =   46.1 PSI  ok",
+            "  preP  =   97.8 kPa  ok",
+            "  postT =  142.6 °F   ok",
+        )
+        val parser = DumpParser()
+        var frame: DumpFrame? = null
+        for (line in lines) frame = parser.feed(line) ?: frame
+        assertNotNull(frame)
+        assertEquals(142, frame.seq)
+        assertTrue(frame.ready)
+        assertEquals(0x1F, frame.healthBitmask)
+        assertEquals(5, frame.readings.size)
+        assertEquals(185.2, frame.readings["oilT"]!!.value, 0.01)
+        assertEquals("PSI", frame.readings["oilP"]!!.unit)
+        assertTrue(frame.readings["preP"]!!.healthOk)
+    }
+
+    @Test
+    fun handlesPartialFrameAcrossFeed() {
+        val parser = DumpParser()
+        assertEquals(null, parser.feed("[seq=1 ready=1 health=0x1F]"))
+        assertEquals(null, parser.feed("  oilT  =  100.0 °F   ok"))
+        // not enough lines yet — frame complete only after 5 sensor lines
+    }
+}
+```
+
+- [ ] **Step 3: Implement**
+
+```kotlin
+class DumpParser {
+    private var pending: DumpFrame? = null
+    private val readings = mutableMapOf<String, SensorReading>()
+
+    private val headerRegex = Regex("""\[seq=(\d+)\s+ready=([01])\s+health=0x([0-9A-Fa-f]+)\]""")
+    private val sensorRegex = Regex("""\s*(\w+)\s*=\s*(-?\d+\.?\d*)\s*(\S+)\s+(\w+)""")
+
+    private val expectedSensors = setOf("oilT", "oilP", "fuelP", "preP", "postT")
+
+    fun feed(line: String): DumpFrame? {
+        headerRegex.matchEntire(line)?.let { m ->
+            pending = DumpFrame(
+                seq = m.groupValues[1].toInt(),
+                ready = m.groupValues[2] == "1",
+                healthBitmask = m.groupValues[3].toInt(16),
+                readings = emptyMap(),
+            )
+            readings.clear()
+            return null
+        }
+
+        if (pending == null) return null
+
+        sensorRegex.matchEntire(line)?.let { m ->
+            val name = m.groupValues[1]
+            if (name !in expectedSensors) return null
+            readings[name] = SensorReading(
+                name = name,
+                value = m.groupValues[2].toDouble(),
+                unit = m.groupValues[3],
+                healthOk = m.groupValues[4] == "ok",
+            )
+            if (readings.size == expectedSensors.size) {
+                val frame = pending!!.copy(readings = readings.toMap())
+                pending = null
+                readings.clear()
+                return frame
+            }
+        }
+
+        return null
+    }
+}
+```
+
+- [ ] **Step 4: Run tests**
+
+```bash
+cd app && ./gradlew testDebugUnitTest
+```
+Expected: all tests pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ble/DumpParser.kt app/src/test/
+git commit -m "feat: BLE periodic-dump parser with unit tests"
+```
+
+---
+
+### Task 66: Dashboard screen (Layout B compact spec list)
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ui/DashboardScreen.kt`
+- Create: `app/src/main/java/works/mees/carduino/ui/DashboardViewModel.kt`
+
+- [ ] **Step 1: ViewModel**
+
+```kotlin
+// DashboardViewModel.kt
+package works.mees.carduino.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import works.mees.carduino.ble.*
+
+data class DashboardState(
+    val deviceName: String = "—",
+    val connected: Boolean = false,
+    val frame: DumpFrame? = null,
+    val firmwareVersion: String? = null,
+)
+
+class DashboardViewModel(
+    private val ble: CarduinoBleClient,
+) : ViewModel() {
+    private val parser = DumpParser()
+    private val _state = MutableStateFlow(DashboardState())
+    val state = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            ble.state.collect { s ->
+                _state.update { it.copy(connected = s is BleState.Connected) }
+            }
+        }
+        viewModelScope.launch {
+            ble.lines.collect { line ->
+                // Parse banner version line
+                if (line.startsWith("CARDUINO-v4 version=")) {
+                    val ver = Regex("""version=(\S+)""").find(line)?.groupValues?.get(1)
+                    _state.update { it.copy(firmwareVersion = ver) }
+                }
+                val frame = parser.feed(line)
+                if (frame != null) _state.update { it.copy(frame = frame) }
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Compose screen (Layout B)**
+
+```kotlin
+// DashboardScreen.kt
+package works.mees.carduino.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import works.mees.carduino.ble.SensorReading
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DashboardScreen(
+    vm: DashboardViewModel,
+    onMenuFirmwareUpdate: () -> Unit,
+    onMenuDiagnostics: () -> Unit,
+) {
+    val state by vm.state.collectAsState()
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(state.deviceName) },
+                actions = {
+                    Text(
+                        if (state.connected) "● connected" else "○ disconnected",
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    IconButton(onClick = { menuOpen = true }) { Text("⋮") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Firmware update…") }, onClick = { menuOpen = false; onMenuFirmwareUpdate() })
+                        DropdownMenuItem(text = { Text("Diagnostics") }, onClick = { menuOpen = false; onMenuDiagnostics() })
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 12.dp)) {
+            val frame = state.frame
+            val order = listOf(
+                "oilT" to "Oil Temp",
+                "oilP" to "Oil Press",
+                "fuelP" to "Fuel Press",
+                "preP" to "Pre-IC MAP",
+                "postT" to "Post-IC Temp",
+            )
+            order.forEach { (key, label) ->
+                val r = frame?.readings?.get(key)
+                SensorRow(label = label, reading = r)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                if (frame != null) "seq ${frame.seq} · health 0x%02X".format(frame.healthBitmask)
+                else "— no data —",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                color = Color.Gray,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SensorRow(label: String, reading: SensorReading?) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).background(
+            if (reading?.healthOk == true) Color(0xFF4ADE80) else Color(0xFFFBBF24),
+            shape = androidx.compose.foundation.shape.CircleShape,
+        ))
+        Spacer(Modifier.width(8.dp))
+        Text(label, modifier = Modifier.weight(1f), fontSize = 13.sp)
+        Text(
+            reading?.let { "%.1f".format(it.value) } ?: "—",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = FontFamily.Monospace,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(reading?.unit ?: "", fontSize = 10.sp, color = Color.Gray)
+    }
+}
+```
+
+- [ ] **Step 3: Wire into MainActivity for now (NavHost in Task 67)**
+
+In `MainActivity.kt`, replace default Compose with `DashboardScreen(viewModel, {}, {})` (placeholders for menu nav). Verify visual layout against the brainstorm Layout B mockup.
+
+- [ ] **Step 4: Run on device**
+
+```bash
+cd app && ./gradlew installDebug
+```
+
+Connect to Carduino. Should see all 5 readings updating. Visual: matches Layout B mockup from brainstorm.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ui/Dashboard*
+git commit -m "feat: live dashboard screen (Layout B compact spec list)"
+```
+
+---
+
+### Task 67: Device picker + DataStore persistence
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/persistence/DeviceStore.kt`
+- Create: `app/src/main/java/works/mees/carduino/ui/DevicePickerScreen.kt`
+- Create: `app/src/main/java/works/mees/carduino/ble/Scanner.kt`
+- Modify: `app/src/main/java/works/mees/carduino/MainActivity.kt` (NavHost between picker and dashboard)
+
+- [ ] **Step 1: Persistence layer**
+
+```kotlin
+// DeviceStore.kt
+package works.mees.carduino.persistence
+
+import android.content.Context
+import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+@Serializable
+data class KnownDevice(
+    val mac: String,
+    val nickname: String,
+    val lastKnownVersion: String? = null,
+    val lastSeenEpochMs: Long = 0,
+)
+
+private val Context.dataStore by preferencesDataStore("devices")
+
+class DeviceStore(private val ctx: Context) {
+    private val keyKnown = stringPreferencesKey("known_devices_json")
+    private val keyCurrent = stringPreferencesKey("current_mac")
+
+    val known: Flow<List<KnownDevice>> = ctx.dataStore.data.map { p ->
+        p[keyKnown]?.let { Json.decodeFromString<List<KnownDevice>>(it) } ?: emptyList()
+    }
+    val currentMac: Flow<String?> = ctx.dataStore.data.map { it[keyCurrent] }
+
+    suspend fun setCurrent(mac: String) {
+        ctx.dataStore.edit { it[keyCurrent] = mac }
+    }
+
+    suspend fun upsert(d: KnownDevice) {
+        ctx.dataStore.edit { p ->
+            val list = p[keyKnown]?.let { Json.decodeFromString<List<KnownDevice>>(it) } ?: emptyList()
+            val updated = list.filter { it.mac != d.mac } + d
+            p[keyKnown] = Json.encodeToString(updated)
+        }
+    }
+
+    suspend fun forget(mac: String) {
+        ctx.dataStore.edit { p ->
+            val list = p[keyKnown]?.let { Json.decodeFromString<List<KnownDevice>>(it) } ?: emptyList()
+            p[keyKnown] = Json.encodeToString(list.filter { it.mac != mac })
+            if (p[keyCurrent] == mac) p.remove(keyCurrent)
+        }
+    }
+}
+```
+
+Add `kotlinx-serialization-json:1.7.3` to `build.gradle.kts` dependencies and apply the `kotlin("plugin.serialization")` plugin.
+
+- [ ] **Step 2: Scanner**
+
+```kotlin
+// Scanner.kt
+package works.mees.carduino.ble
+
+import android.bluetooth.BluetoothManager
+import android.bluetooth.le.*
+import android.content.Context
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+
+data class ScannedDevice(val mac: String, val name: String, val rssi: Int)
+
+fun scanForCarduinos(ctx: Context) = callbackFlow<ScannedDevice> {
+    val scanner = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
+        .adapter.bluetoothLeScanner
+
+    val cb = object : ScanCallback() {
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            val name = result.device.name ?: result.scanRecord?.deviceName ?: return
+            if (name == "CARDUINO-v4") {
+                trySend(ScannedDevice(result.device.address, name, result.rssi))
+            }
+        }
+    }
+    scanner?.startScan(cb)
+    awaitClose { scanner?.stopScan(cb) }
+}
+```
+
+- [ ] **Step 3: Picker screen (minimal — one current device)**
+
+The data model is multi-aware (a list of `KnownDevice`) but the v1 UX is single-device. The picker shows:
+
+- If a current device is set: nothing — autoconnect from `MainActivity` skips this screen entirely.
+- If no current device: a "Nearby Carduinos" scan list. Tap one → name-prompt dialog → store as current → dashboard.
+
+To switch devices later: a "Forget current device" affordance in the dashboard's overflow menu (not on the picker). Tapping that clears the current MAC and returns to this picker. No managed-list UI, no rename, no long-press, no last-seen display.
+
+```kotlin
+// DevicePickerScreen.kt
+package works.mees.carduino.ui
+
+import android.content.Context
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collect
+import works.mees.carduino.ble.ScannedDevice
+import works.mees.carduino.ble.scanForCarduinos
+import works.mees.carduino.persistence.DeviceStore
+import works.mees.carduino.persistence.KnownDevice
+
+@Composable
+fun DevicePickerScreen(
+    store: DeviceStore,
+    onSelect: () -> Unit,
+) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val seen = remember { mutableStateMapOf<String, ScannedDevice>() }
+    LaunchedEffect(Unit) {
+        scanForCarduinos(ctx).collect { d -> seen[d.mac] = d }
+    }
+    var promptMac by remember { mutableStateOf<String?>(null) }
+    var nickname by remember { mutableStateOf("Carduino") }
+
+    Scaffold(topBar = { TopAppBar(title = { Text("Pick a Carduino") }) }) { p ->
+        Column(Modifier.padding(p).fillMaxSize().padding(16.dp)) {
+            Text("Nearby devices", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(8.dp))
+            LazyColumn {
+                items(seen.values.toList()) { d ->
+                    ListItem(
+                        headlineContent = { Text(d.name) },
+                        supportingContent = { Text("${d.mac} · RSSI ${d.rssi}") },
+                        modifier = Modifier.clickable { promptMac = d.mac },
+                    )
+                }
+            }
+            if (seen.isEmpty()) {
+                Text("Scanning…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+
+    promptMac?.let { mac ->
+        AlertDialog(
+            onDismissRequest = { promptMac = null },
+            title = { Text("Name this device") },
+            text = {
+                OutlinedTextField(value = nickname, onValueChange = { nickname = it }, label = { Text("Nickname") })
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val coroutineScope = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycleScope
+                    coroutineScope.launch {
+                        store.upsert(KnownDevice(mac = mac, nickname = nickname.trim().ifEmpty { "Carduino" }, lastSeenEpochMs = System.currentTimeMillis()))
+                        store.setCurrent(mac)
+                        promptMac = null
+                        onSelect()
+                    }
+                }) { Text("Connect") }
+            },
+            dismissButton = { TextButton(onClick = { promptMac = null }) { Text("Cancel") } },
+        )
+    }
+}
+```
+
+Add a "Forget current device" item to the dashboard's overflow menu (Task 66's existing menu), wired to:
+```kotlin
+DropdownMenuItem(text = { Text("Forget device") }, onClick = {
+    menuOpen = false
+    scope.launch {
+        store.currentMac.first()?.let { store.forget(it) }
+        nav.navigate("picker") { popUpTo(0) }
+    }
+})
+```
+
+- [ ] **Step 4: NavHost in MainActivity**
+
+```kotlin
+val nav = rememberNavController()
+NavHost(nav, startDestination = "picker") {
+    composable("picker") { DevicePickerScreen(store, onSelect = { nav.navigate("dashboard") }) }
+    composable("dashboard") { DashboardScreen(vm, onMenuFirmwareUpdate = { nav.navigate("ota") }, onMenuDiagnostics = { nav.navigate("diag") }) }
+    // ota and diag added in later tasks
+}
+```
+
+On launch: if `currentMac` is set, navigate directly to dashboard; else picker.
+
+- [ ] **Step 5: Manual test**
+
+Launch app on fresh install → picker shows. Tap Carduino → connects → dashboard. Force-quit. Re-launch → goes straight to dashboard.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/persistence/ app/src/main/java/works/mees/carduino/ui/DevicePicker* app/src/main/java/works/mees/carduino/ble/Scanner.kt app/src/main/java/works/mees/carduino/MainActivity.kt
+git commit -m "feat: device picker + DataStore persistence (multi-aware data model, single-device UX)"
+```
+
+---
+
+### Task 68: Connection lifecycle + autoconnect
+
+**Files:**
+- Modify: `app/src/main/java/works/mees/carduino/ble/CarduinoBleClient.kt` (add autoreconnect)
+- Modify: `app/src/main/java/works/mees/carduino/ui/DashboardViewModel.kt` (orchestrate)
+
+- [ ] **Step 1: Backoff schedule**
+
+In `CarduinoBleClient`, on `STATE_DISCONNECTED` (when state was `Connected`):
+
+```kotlin
+private val backoff = listOf(0L, 1_000L, 5_000L, 15_000L, 30_000L, 60_000L)
+private var attempt = 0
+private var paused = false  // true when app backgrounded
+
+private fun scheduleReconnect(mac: String) {
+    if (paused) return
+    val delayMs = backoff.getOrElse(attempt) { 60_000L }
+    attempt++
+    scope.launch {
+        delay(delayMs)
+        connect(mac)
+    }
+}
+```
+
+Reset `attempt = 0` on successful `STATE_CONNECTED`.
+
+- [ ] **Step 2: Wire ViewModel pause/resume**
+
+```kotlin
+// In MainActivity
+DisposableEffect(Unit) {
+    val obs = LifecycleEventObserver { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_PAUSE -> ble.pauseReconnect()
+            Lifecycle.Event.ON_RESUME -> ble.resumeReconnect()
+            else -> {}
+        }
+    }
+    lifecycle.addObserver(obs)
+    onDispose { lifecycle.removeObserver(obs) }
+}
+```
+
+- [ ] **Step 3: Manual test**
+
+Launch app, connect, walk out of BLE range. Observe disconnect → reconnect attempts at 1s, 5s, 15s... Walk back in range → connects. Background app → reconnect pauses. Foreground → resumes.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ble/CarduinoBleClient.kt app/src/main/java/works/mees/carduino/MainActivity.kt
+git commit -m "feat: BLE autoreconnect with backoff and lifecycle pause"
+```
+
+---
+
+### Task 69: Diagnostic actions screen
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ui/DiagnosticsScreen.kt`
+- Create: `app/src/main/java/works/mees/carduino/ui/DiagnosticsViewModel.kt`
+
+- [ ] **Step 1: ViewModel — single-shot command + result capture**
+
+```kotlin
+// DiagnosticsViewModel.kt
+class DiagnosticsViewModel(private val ble: CarduinoBleClient) : ViewModel() {
+    private val _output = MutableStateFlow("")
+    val output = _output.asStateFlow()
+
+    fun run(cmd: String) {
+        viewModelScope.launch {
+            _output.value = "> $cmd\n"
+            ble.writeLine(cmd)
+            // Capture next ~3 sec of lines as the response
+            val collector = launch {
+                ble.lines.takeWhile { true }.collect { _output.update { v -> "$v$it\n" } }
+            }
+            delay(3000)
+            collector.cancel()
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Screen with five buttons + scrolling output**
+
+```kotlin
+@Composable
+fun DiagnosticsScreen(vm: DiagnosticsViewModel, onBack: () -> Unit) {
+    val out by vm.output.collectAsState()
+    Scaffold(topBar = { TopAppBar(title = { Text("Diagnostics") }, navigationIcon = { IconButton(onClick = onBack) { Text("←") } }) }) { p ->
+        Column(Modifier.padding(p).fillMaxSize().padding(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { vm.run("reboot") }) { Text("Reboot") }
+                FilledTonalButton(onClick = { vm.run("selftest") }) { Text("Self-test") }
+                FilledTonalButton(onClick = { vm.run("clear errors") }) { Text("Clear errors") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { vm.run("boot") }) { Text("Boot info") }
+                FilledTonalButton(onClick = { vm.run("log") }) { Text("Event log") }
+            }
+            Spacer(Modifier.height(16.dp))
+            Surface(modifier = Modifier.fillMaxSize(), tonalElevation = 1.dp) {
+                Text(
+                    out,
+                    modifier = Modifier.padding(8.dp).verticalScroll(rememberScrollState()),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 3: Add to NavHost**
+
+```kotlin
+composable("diag") { DiagnosticsScreen(diagVm, onBack = { nav.popBackStack() }) }
+```
+
+- [ ] **Step 4: Manual test**
+
+Tap each button. Expected: `>` echo of the command, then the device's response over the next ~3 sec.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ui/Diagnostics*
+git commit -m "feat: diagnostics screen wrapping reboot/selftest/clear-errors/boot-info/event-log"
+```
+
+---
+
+## Phase O: Android OTA Wizard (Tasks 70-76)
+
+### Task 70: 🧪 Storage Access Framework file picker + size validation
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ota/FilePicker.kt`
+- Create: `app/src/main/java/works/mees/carduino/ota/SizeValidation.kt`
+- Create: `app/src/test/java/works/mees/carduino/ota/SizeValidationTest.kt`
+
+- [ ] **Step 1: Define the size validation rule**
+
+```kotlin
+// SizeValidation.kt
+package works.mees.carduino.ota
+
+const val CARDUINO_R4_MAX_SKETCH_BYTES = 130_048   // ~half of 256 KB, page-aligned
+
+sealed class SizeCheck {
+    object Ok : SizeCheck()
+    data class TooLarge(val bytes: Long, val max: Int) : SizeCheck()
+    object Empty : SizeCheck()
+}
+
+fun validateSketchSize(bytes: Long): SizeCheck = when {
+    bytes <= 0 -> SizeCheck.Empty
+    bytes > CARDUINO_R4_MAX_SKETCH_BYTES -> SizeCheck.TooLarge(bytes, CARDUINO_R4_MAX_SKETCH_BYTES)
+    else -> SizeCheck.Ok
+}
+```
+
+- [ ] **Step 2: Test**
+
+```kotlin
+// SizeValidationTest.kt
+class SizeValidationTest {
+    @Test fun acceptsCurrentSketchSize() {
+        assertEquals(SizeCheck.Ok, validateSketchSize(104_880))
+    }
+    @Test fun rejectsOversize() {
+        val r = validateSketchSize(200_000) as SizeCheck.TooLarge
+        assertEquals(200_000L, r.bytes)
+    }
+    @Test fun rejectsZero() {
+        assertEquals(SizeCheck.Empty, validateSketchSize(0))
+    }
+}
+```
+
+Run: `./gradlew testDebugUnitTest`. Expected: pass.
+
+- [ ] **Step 3: SAF file picker**
+
+```kotlin
+// FilePicker.kt
+package works.mees.carduino.ota
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import android.content.Context
+import android.net.Uri
+
+@Composable
+fun rememberBinFilePicker(onPicked: (Uri, Long) -> Unit) = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.OpenDocument(),
+) { uri ->
+    if (uri == null) return@rememberLauncherForActivityResult
+    // Get size via DocumentsContract
+    val ctx = LocalContext.current  // pulled into the calling Composable
+    val size = ctx.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: 0L
+    onPicked(uri, size)
+}
+```
+
+(Mime filter: `arrayOf("application/octet-stream")` plus the catchall `"*/*"` since `.bin` mimes vary by FS provider.)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ota/ app/src/test/
+git commit -m "feat: SAF file picker + size validation with unit tests"
+```
+
+---
+
+### Task 71: 🔧 LocalOnlyHotspot lifecycle with Network capture
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ota/LohManager.kt`
+
+**Why both LOH callback + ConnectivityManager:** the LOH reservation gives us SSID/passphrase but not the underlying `Network` object. Task 73 needs the `Network` to scope OkHttp's socketFactory so the HTTP request actually goes through the LOH AP rather than cellular. We capture the Network via a `NetworkCallback` filtered for `TRANSPORT_WIFI + NET_CAPABILITY_NOT_VPN` registered alongside LOH start.
+
+- [ ] **Step 1: Implementation with linked NetworkCallback**
+
+```kotlin
+// LohManager.kt
+package works.mees.carduino.ota
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.wifi.WifiManager
+import android.os.Build
+import androidx.annotation.RequiresApi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
+
+data class LohSession(
+    val ssid: String,
+    val passphrase: String,
+    val network: Network,                                   // non-nullable now
+    private val reservation: WifiManager.LocalOnlyHotspotReservation,
+    private val cm: ConnectivityManager,
+    private val networkCallback: ConnectivityManager.NetworkCallback,
+) {
+    fun close() {
+        runCatching { cm.unregisterNetworkCallback(networkCallback) }
+        runCatching { reservation.close() }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@SuppressLint("MissingPermission")
+suspend fun startLoh(ctx: Context): LohSession? {
+    val wifi = ctx.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+    // Step A: register network callback FIRST so we don't miss the onAvailable event
+    val networkDeferred = CompletableDeferred<Network>()
+    val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            // We may see multiple WiFi networks; the LOH one is the WiFi network with
+            // NET_CAPABILITY_NOT_INTERNET on most OEMs (LOH has no internet sharing).
+            // To disambiguate: this callback is registered at LOH start, so the next
+            // matching onAvailable IS the LOH network.
+            if (!networkDeferred.isCompleted) networkDeferred.complete(network)
+        }
+    }
+    val req = NetworkRequest.Builder()
+        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+        .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)  // LOH typically lacks internet
+        .build()
+    cm.registerNetworkCallback(req, networkCallback)
+
+    // Step B: start LOH
+    val reservationDeferred = CompletableDeferred<WifiManager.LocalOnlyHotspotReservation?>()
+    val lohCb = object : WifiManager.LocalOnlyHotspotCallback() {
+        override fun onStarted(r: WifiManager.LocalOnlyHotspotReservation) { reservationDeferred.complete(r) }
+        override fun onStopped() {}
+        override fun onFailed(reason: Int) { reservationDeferred.complete(null) }
+    }
+    wifi.startLocalOnlyHotspot(lohCb, null)
+
+    val reservation = withTimeoutOrNull(15_000) { reservationDeferred.await() }
+    if (reservation == null) {
+        runCatching { cm.unregisterNetworkCallback(networkCallback) }
+        return null
+    }
+
+    // Step C: wait for the network callback to fire — typically <2 sec after onStarted
+    val network = withTimeoutOrNull(10_000) { networkDeferred.await() }
+    if (network == null) {
+        runCatching { reservation.close() }
+        runCatching { cm.unregisterNetworkCallback(networkCallback) }
+        return null
+    }
+
+    val cfg = reservation.softApConfiguration
+    return LohSession(
+        ssid = cfg.ssid ?: "",
+        passphrase = cfg.passphrase ?: "",
+        network = network,
+        reservation = reservation,
+        cm = cm,
+        networkCallback = networkCallback,
+    )
+}
+```
+
+- [ ] **Step 2: Bench-test that the captured Network is the LOH one**
+
+Add a temporary debug button to call `startLoh()`, log SSID + passphrase + `network.toString()`. Connect a laptop to the hotspot. Then verify: `network.getAllByName("192.168.43.1")` resolves on that Network (laptop is the only client; should be reachable). If `network` ends up being some other WiFi network, the capability filter is wrong and needs adjusting.
+
+- [ ] **Step 3: Document any OEM quirks observed in `prototypes/loh_android/notes-results.md`**
+
+Specifically note whether `NET_CAPABILITY_INTERNET` is removed or present on the S25+'s LOH — if present, remove the `removeCapability` line and instead disambiguate by SSID match.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ota/LohManager.kt prototypes/loh_android/notes-results.md
+git commit -m "feat: LocalOnlyHotspot with ConnectivityManager Network capture for OkHttp scoping"
+```
+
+---
+
+### Task 72: 🔧 NsdManager mDNS lookup of `_arduino._tcp` scoped to LOH network
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt`
+
+**Why scoped:** Android's default `NsdManager.discoverServices` runs on the system-default network. While LOH is active that may be cellular (or a different WiFi). The Carduino's mDNS responder is only reachable on the LOH network. We scope discovery via `Network.bindSocket()` on a temporary socket, OR use the API 30+ `NsdManager.discoverServices(NsdManager.DiscoveryRequest)` overload that accepts a `Network`.
+
+- [ ] **Step 1: Implementation**
+
+```kotlin
+// MdnsLookup.kt
+package works.mees.carduino.ota
+
+import android.content.Context
+import android.net.Network
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
+import android.os.Build
+import kotlinx.coroutines.*
+import java.net.InetAddress
+
+suspend fun resolveCarduinoIp(
+    ctx: Context,
+    network: Network,
+    expectedName: String = "carduino-v4",
+    timeoutMs: Long = 15_000,
+): InetAddress? = withTimeoutOrNull(timeoutMs) {
+    val nsd = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val deferred = CompletableDeferred<InetAddress>()
+
+    val listener = object : NsdManager.DiscoveryListener {
+        override fun onDiscoveryStarted(serviceType: String) {}
+        override fun onDiscoveryStopped(serviceType: String) {}
+        override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+            if (!deferred.isCompleted) deferred.completeExceptionally(RuntimeException("startDiscovery failed: $errorCode"))
+        }
+        override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+        override fun onServiceFound(info: NsdServiceInfo) {
+            if (info.serviceName != expectedName) return
+            // Resolve via a network-scoped resolver if available
+            val resolveListener = object : NsdManager.ResolveListener {
+                override fun onResolveFailed(s: NsdServiceInfo, e: Int) {}
+                override fun onServiceResolved(s: NsdServiceInfo) {
+                    if (!deferred.isCompleted) deferred.complete(s.host)
+                }
+            }
+            nsd.resolveService(info, resolveListener)
+        }
+        override fun onServiceLost(info: NsdServiceInfo) {}
+    }
+
+    // Network scoping:
+    // API 33+ (T): NsdManager.discoverServices(DiscoveryRequest.Builder(...).setNetwork(network).build(), executor, listener)
+    // API <33: bindProcessToNetwork(network) for the duration of discovery
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val request = android.net.nsd.NsdManager.DiscoveryRequest.Builder("_arduino._tcp.")
+            .setNetwork(network)
+            .build()
+        nsd.discoverServices(request, java.util.concurrent.Executors.newSingleThreadExecutor(), listener)
+    } else {
+        // Fallback: bind process to the LOH network for the discovery scope
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val prevBound = cm.boundNetworkForProcess
+        cm.bindProcessToNetwork(network)
+        try {
+            nsd.discoverServices("_arduino._tcp.", NsdManager.PROTOCOL_DNS_SD, listener)
+            deferred.await()
+        } finally {
+            cm.bindProcessToNetwork(prevBound)
+        }
+        return@withTimeoutOrNull deferred.await().also {
+            runCatching { nsd.stopServiceDiscovery(listener) }
+        }
+    }
+
+    try {
+        deferred.await()
+    } finally {
+        runCatching { nsd.stopServiceDiscovery(listener) }
+    }
+}
+```
+
+(Note: minSdk for v4.x is API 26. The S25+ on Android 16 is API 36 — so the `TIRAMISU` branch is the actual path; the bindProcessToNetwork branch is a fallback for older emulator testing.)
+
+- [ ] **Step 2: Bench-test against Task 53's listener**
+
+Re-flash Task 53's `jandrassy_proto` listener on R4 (joined to phone hotspot). On the phone, call `startLoh()` (Task 71) — wait, this is a chicken-and-egg: the R4 needs to be on the LOH, not the phone hotspot, to test scoped discovery. **For this bench test, the laptop simulates the phone:** put both R4 and laptop on the phone hotspot, run a tiny Android-on-emulator NsdManager scan from the laptop and confirm it finds the service.
+
+For real validation: this only fully works once Tasks 71+72+73 chain together in Task 74. Add a "v4.x e2e" verification note here as a known-deferred check.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt
+git commit -m "feat: NsdManager mDNS lookup scoped to LOH Network"
+```
+
+---
+
+### Task 73: HTTP push (OkHttp, Basic auth, network binding)
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ota/OtaPusher.kt`
+
+- [ ] **Step 1: Implementation**
+
+```kotlin
+// OtaPusher.kt
+package works.mees.carduino.ota
+
+import android.content.Context
+import android.net.Uri
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.InetAddress
+import java.util.concurrent.TimeUnit
+
+sealed class OtaResult {
+    object Success : OtaResult()
+    data class HttpError(val code: Int, val body: String) : OtaResult()
+    data class NetworkError(val cause: Throwable) : OtaResult()
+}
+
+suspend fun pushOta(
+    ctx: Context,
+    deviceIp: InetAddress,
+    sketchUri: Uri,
+    otaPassword: String,
+    network: android.net.Network?,
+    onProgress: (Long, Long) -> Unit,
+): OtaResult {
+    val sizeFd = ctx.contentResolver.openFileDescriptor(sketchUri, "r") ?: return OtaResult.NetworkError(IllegalStateException("can't open .bin"))
+    val totalBytes = sizeFd.statSize
+    sizeFd.close()
+
+    val builder = OkHttpClient.Builder()
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+    if (network != null) builder.socketFactory(network.socketFactory)
+    val client = builder.build()
+
+    val body = ProgressRequestBody(ctx, sketchUri, totalBytes, "application/octet-stream", onProgress)
+    val req = Request.Builder()
+        .url("http://${deviceIp.hostAddress}:65280/sketch")
+        .post(body)
+        .header("Authorization", Credentials.basic("arduino", otaPassword))
+        .build()
+
+    return try {
+        client.newCall(req).execute().use { resp ->
+            if (resp.isSuccessful) OtaResult.Success
+            else OtaResult.HttpError(resp.code, resp.body?.string() ?: "")
+        }
+    } catch (e: Exception) {
+        OtaResult.NetworkError(e)
+    }
+}
+
+private class ProgressRequestBody(
+    private val ctx: Context,
+    private val uri: Uri,
+    private val total: Long,
+    private val contentType: String,
+    private val onProgress: (Long, Long) -> Unit,
+) : RequestBody() {
+    override fun contentType() = contentType.toMediaType()
+    override fun contentLength() = total
+    override fun writeTo(sink: okio.BufferedSink) {
+        ctx.contentResolver.openInputStream(uri)!!.use { input ->
+            val buf = ByteArray(4096)
+            var sent = 0L
+            while (true) {
+                val n = input.read(buf)
+                if (n <= 0) break
+                sink.write(buf, 0, n)
+                sent += n
+                onProgress(sent, total)
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Bench test**
+
+While Task 53's listener runs on the R4, call `pushOta(ctx, deviceIp, sketchUri, "testpw", null, ...)` from a temp button, with a small test `.bin` picked via SAF. Expected: progress callbacks fire as bytes are sent; result is `Success`; device reboots into pushed sketch.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ota/OtaPusher.kt
+git commit -m "feat: OkHttp OTA push with progress + Basic auth + network binding"
+```
+
+---
+
+### Task 74: OTA wizard UI orchestration
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ui/OtaWizardScreen.kt`
+- Create: `app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt`
+
+- [ ] **Step 1: ViewModel orchestrating the full flow**
+
+```kotlin
+// OtaViewModel.kt
+sealed class OtaStep {
+    object PickFile : OtaStep()
+    data class PreFlight(val uri: Uri, val sizeBytes: Long) : OtaStep()
+    object EnteringMaintenance : OtaStep()
+    object FindingDevice : OtaStep()
+    data class Uploading(val sent: Long, val total: Long) : OtaStep()
+    object Applying : OtaStep()
+    object Verifying : OtaStep()
+    data class Done(val newVersion: String) : OtaStep()
+    data class Failed(val reason: String, val showUsbRescue: Boolean) : OtaStep()
+}
+
+class OtaViewModel(
+    private val ble: CarduinoBleClient,
+    private val store: DeviceStore,
+    private val ctx: Context,
+) : ViewModel() {
+    private val _step = MutableStateFlow<OtaStep>(OtaStep.PickFile)
+    val step = _step.asStateFlow()
+
+    fun fileSelected(uri: Uri, size: Long) {
+        when (val r = validateSketchSize(size)) {
+            is SizeCheck.Ok -> _step.value = OtaStep.PreFlight(uri, size)
+            is SizeCheck.TooLarge -> _step.value = OtaStep.Failed("File is ${r.bytes} bytes, max is ${r.max}", false)
+            is SizeCheck.Empty -> _step.value = OtaStep.Failed("File is empty", false)
+        }
+    }
+
+    fun startUpdate(uri: Uri) {
+        viewModelScope.launch {
+            _step.value = OtaStep.EnteringMaintenance
+
+            // Stash the device MAC + pre-OTA version so we can update DeviceStore after success
+            val mac = (ble.state.value as? BleState.Connected)?.mac
+                ?: run { fail("Not connected to a device", false); return@launch }
+
+            val loh = startLoh(ctx)
+            if (loh == null) { fail("Local-only hotspot unavailable", true); return@launch }
+
+            val pwd = generateOtaPassword()
+            val ssid = pctEncode(loh.ssid)
+            val psk = pctEncode(loh.passphrase)
+            val pwdEnc = pctEncode(pwd)
+
+            // Subscribe to BLE lines BEFORE issuing the write so we don't miss the reply.
+            val ackJob = async { ble.lines.first { it.startsWith("OK maintenance ") || it.startsWith("ERR maintenance ") } }
+            ble.writeLine("maintenance ssid=$ssid psk=$psk pwd=$pwdEnc")
+
+            val ack = withTimeoutOrNull(5_000) { ackJob.await() }
+            if (ack == null) {
+                ackJob.cancel(); loh.close()
+                fail("Device didn't acknowledge maintenance command (BLE write may have failed)", true)
+                return@launch
+            }
+            if (ack.startsWith("ERR maintenance ")) {
+                loh.close()
+                fail("Device rejected maintenance command: ${ack.removePrefix("ERR maintenance ").trim()}", false)
+                return@launch
+            }
+            // ack is "OK maintenance armed timeout=3000"; firmware will drop BLE in ~3 sec, then join WiFi.
+            // Wait for the BLE disconnect + a small grace for the WiFi join.
+            withTimeoutOrNull(15_000) { ble.state.first { it !is BleState.Connected } }
+            delay(3_000)  // grace for WiFi join
+
+            _step.value = OtaStep.FindingDevice
+            val ip = resolveCarduinoIp(ctx, loh.network, timeoutMs = 15_000)
+            if (ip == null) { loh.close(); fail("Device didn't appear on hotspot", true); return@launch }
+
+            _step.value = OtaStep.Uploading(0, 0)
+            val result = pushOta(ctx, ip, uri, pwd, loh.network) { s, t ->
+                _step.value = OtaStep.Uploading(s, t)
+            }
+            loh.close()
+
+            when (result) {
+                is OtaResult.Success -> verifyAfterApply(mac)
+                is OtaResult.HttpError -> fail("HTTP ${result.code}: ${result.body}", false)
+                is OtaResult.NetworkError -> {
+                    // Per V4X-DESIGN.md §7: outcome is unknown. Don't blindly fail — scan BLE first.
+                    // If the device comes back with the new banner, treat as success.
+                    // If it comes back with the old banner, the upload didn't apply; let user retry.
+                    // If it doesn't come back at all, recommend USB rescue.
+                    _step.value = OtaStep.Verifying
+                    val outcome = withTimeoutOrNull(30_000) {
+                        ble.state.first { it is BleState.Connected }
+                        ble.lines.first { it.startsWith("CARDUINO-v4 version=") }
+                    }
+                    if (outcome == null) {
+                        fail("Push outcome unknown and device didn't come back over BLE", true)
+                    } else {
+                        val newVer = Regex("""version=(\S+)""").find(outcome)?.groupValues?.get(1) ?: "unknown"
+                        // We don't know what the pre-OTA version was here — for v1, just report "back online"
+                        store.upsert(KnownDevice(mac, store.known.first().firstOrNull { it.mac == mac }?.nickname ?: "Carduino", lastKnownVersion = newVer, lastSeenEpochMs = System.currentTimeMillis()))
+                        _step.value = OtaStep.Done(newVer)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun verifyAfterApply(mac: String) {
+        viewModelScope.launch {
+            _step.value = OtaStep.Applying
+            // Wait ~10 sec for apply + reboot
+            delay(10_000)
+            _step.value = OtaStep.Verifying
+
+            // Reconnect BLE — autoreconnect should kick in. Just wait for state.
+            val newVersion = withTimeoutOrNull(30_000) {
+                ble.state.first { it is BleState.Connected }
+                val ver = ble.lines.first { it.startsWith("CARDUINO-v4 version=") }
+                Regex("""version=(\S+)""").find(ver)?.groupValues?.get(1) ?: "unknown"
+            }
+            if (newVersion == null) {
+                fail("Device didn't come back over BLE", true)
+                return@launch
+            }
+            // Persist the new version against this device's record
+            val existing = store.known.first().firstOrNull { it.mac == mac }
+            store.upsert(KnownDevice(
+                mac = mac,
+                nickname = existing?.nickname ?: "Carduino",
+                lastKnownVersion = newVersion,
+                lastSeenEpochMs = System.currentTimeMillis(),
+            ))
+            _step.value = OtaStep.Done(newVersion)
+        }
+    }
+
+    private fun fail(reason: String, usb: Boolean) {
+        _step.value = OtaStep.Failed(reason, usb)
+    }
+}
+
+private fun pctEncode(s: String): String = buildString {
+    s.forEach { c ->
+        if (c.isLetterOrDigit() || c in "-._~") append(c)
+        else append("%%%02X".format(c.code))
+    }
+}
+
+private fun generateOtaPassword(): String {
+    val chars = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    return (1..16).map { chars.random() }.joinToString("")
+}
+```
+
+- [ ] **Step 2: Wizard screen — single screen with state-driven content**
+
+```kotlin
+@Composable
+fun OtaWizardScreen(vm: OtaViewModel, onDone: () -> Unit, onUsbRescue: () -> Unit) {
+    val step by vm.step.collectAsState()
+    val picker = rememberBinFilePicker { uri, size -> vm.fileSelected(uri, size) }
+
+    Surface(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Column {
+            Text("Firmware update", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            when (val s = step) {
+                is OtaStep.PickFile -> Button(onClick = { picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
+                    Text("Pick .bin file")
+                }
+                is OtaStep.PreFlight -> {
+                    var ack by remember { mutableStateOf(false) }
+                    Column {
+                        Text("File size: ${s.sizeBytes} bytes (${(100 * s.sizeBytes / CARDUINO_R4_MAX_SKETCH_BYTES)}% of flash)")
+                        Spacer(Modifier.height(8.dp))
+                        Text("⚠ Engine off, ignition on for stable power. Don't crank or cycle power until the app says complete.")
+                        Spacer(Modifier.height(8.dp))
+                        Row { Checkbox(ack, onCheckedChange = { ack = it }); Text("I confirm engine is off") }
+                        Spacer(Modifier.height(8.dp))
+                        Button(enabled = ack, onClick = { vm.startUpdate(s.uri) }) { Text("Start update") }
+                    }
+                }
+                is OtaStep.EnteringMaintenance -> { CircularProgressIndicator(); Text("Sending maintenance command…") }
+                is OtaStep.FindingDevice -> { CircularProgressIndicator(); Text("Looking for device on hotspot…") }
+                is OtaStep.Uploading -> {
+                    val pct = if (s.total > 0) (100f * s.sent / s.total).toInt() else 0
+                    LinearProgressIndicator(progress = { pct / 100f }, modifier = Modifier.fillMaxWidth())
+                    Text("Uploading $pct% (${s.sent} / ${s.total} B)")
+                }
+                is OtaStep.Applying -> { CircularProgressIndicator(); Text("Device is flashing. Don't disturb.") }
+                is OtaStep.Verifying -> { CircularProgressIndicator(); Text("Waiting for device to come back over BLE…") }
+                is OtaStep.Done -> {
+                    Text("✓ Update complete. Now running ${s.newVersion}.")
+                    Button(onClick = onDone) { Text("Back to dashboard") }
+                }
+                is OtaStep.Failed -> {
+                    Text("⚠ ${s.reason}")
+                    if (s.showUsbRescue) Button(onClick = onUsbRescue) { Text("USB rescue instructions") }
+                    Button(onClick = onDone) { Text("Back to dashboard") }
+                }
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 3: NavHost integration**
+
+```kotlin
+composable("ota") { OtaWizardScreen(otaVm, onDone = { nav.popBackStack() }, onUsbRescue = { nav.navigate("usb_rescue") }) }
+```
+
+- [ ] **Step 4: Manual end-to-end test**
+
+The test target needs to be a **production-firmware build** (Tasks 56-62 in place) so the BLE banner with `version=` is present after reboot. Task 53's test-sketch has no BLE and won't satisfy the verify step.
+
+Build a candidate `.bin`:
+```bash
+# Bump FIRMWARE_VERSION patch in config.h to 4.1.1 (or any string distinguishable from current)
+GIT_SHA=$(git rev-parse --short HEAD)
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
+    --fqbn arduino:renesas_uno:unor4wifi \
+    --output-dir build/test-ota/ \
+    --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
+    carduino-v4/
+```
+
+Then walk through the wizard with `build/test-ota/carduino-v4.ino.bin`. Expected: device reboots into 4.1.1, app reconnects, "Update complete. Now running 4.1.1." (Roll back to the original version via USB after testing.)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ui/Ota*
+git commit -m "feat: OTA wizard end-to-end orchestration (file pick → push → verify)"
+```
+
+---
+
+### Task 75: Post-apply BLE reconnect verification (refine timing)
+
+**Files:**
+- Modify: `app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt` (refine verify step)
+
+This is a refinement task — the wizard works after Task 74, but the verification timing may be flaky in real conditions. Use this task to tighten it.
+
+- [ ] **Step 1: Run 5 OTA cycles end-to-end on the bench, log the timing**
+
+Create a debug log of:
+- Time from HTTP 200 to BLE rediscovery
+- Whether 30 sec verify timeout was sufficient
+- Whether banner version line arrived as expected
+
+- [ ] **Step 2: Adjust delays based on data**
+
+If verify timing is consistently fast: trim to 20 sec timeout. If slow: extend to 45 sec.
+
+- [ ] **Step 3: Add explicit "still waiting…" message if verify is mid-progress at 15 sec**
+
+```kotlin
+// In verifyAfterApply:
+val deadline = System.currentTimeMillis() + 30_000
+while (System.currentTimeMillis() < deadline) {
+    if (ble.state.value is BleState.Connected) {
+        // proceed to read banner ...
+        return@launch
+    }
+    if (deadline - System.currentTimeMillis() < 15_000) {
+        // update step text to "Still waiting for device…"
+    }
+    delay(500)
+}
+fail("Device didn't come back over BLE in 30 sec", true)
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt
+git commit -m "tune: post-apply verify timing based on bench measurement"
+```
+
+---
+
+### Task 76: USB rescue screen
+
+**Files:**
+- Create: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`
+- Modify: `docs/bench-test-procedures.md` (add bootloader-force section)
+
+- [ ] **Step 1: Verify the bootloader-force procedure on Matthew's R4 clone**
+
+V4X-DESIGN.md §11 calls this out: the standard Arduino-OEM procedure is "double-tap reset to enter BOSSA mode," but R4 clones may differ. Before writing the rescue screen, prove the procedure works:
+
+1. Flash a deliberately-broken sketch (e.g., one with `while(true) {}` in setup blocking USB enumeration) via USB to put the device in a "stuck" state where normal upload fails.
+2. Try the recovery procedure — double-tap reset.
+3. Watch for the bootloader's distinctive yellow LED pulse.
+4. Run `arduino-cli upload` to recover with the production firmware.
+5. Document in `docs/bench-test-procedures.md`:
+   - Exact button sequence that worked (double-tap timing, hold duration, etc.)
+   - Visible LED indication that bootloader mode is active
+   - Whether `arduino-cli` reconnects automatically or needs the COM port re-specified
+   - Any clone-specific quirks
+
+The text in the rescue screen (Step 2 below) must match what was actually verified.
+
+- [ ] **Step 2: Bundled instructions (use real verified procedure)**
+
+```kotlin
+@Composable
+fun UsbRescueScreen(onBack: () -> Unit) {
+    Scaffold(topBar = { TopAppBar(title = { Text("USB rescue") }, navigationIcon = { IconButton(onClick = onBack) { Text("←") } }) }) { p ->
+        Column(Modifier.padding(p).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
+            Text("If wireless update failed, recover via USB:", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+
+            Text("1. Plug the Carduino's USB-C port into a laptop with `arduino-cli` installed.")
+            Spacer(Modifier.height(8.dp))
+
+            Text("2. If the device isn't seen, force the bootloader:")
+            Text("   • Double-tap the reset button quickly", modifier = Modifier.padding(start = 8.dp))
+            Text("   • The yellow LED should pulse — bootloader is active", modifier = Modifier.padding(start = 8.dp))
+            Spacer(Modifier.height(8.dp))
+
+            Text("3. Re-flash the last known-good firmware:")
+            Card(modifier = Modifier.padding(vertical = 4.dp)) {
+                Text(
+                    """arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/carduino-v4/""",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+
+            Text("4. Re-open this app and confirm the new banner version.")
+        }
+    }
+}
+```
+
+- [ ] **Step 3: Add to NavHost + reachable from diagnostics screen**
+
+```kotlin
+composable("usb_rescue") { UsbRescueScreen(onBack = { nav.popBackStack() }) }
+```
+
+In `DiagnosticsScreen`, add a button: `FilledTonalButton(onClick = onUsbRescue) { Text("USB rescue") }`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt docs/bench-test-procedures.md
+git commit -m "feat: USB rescue screen + bootloader-force procedure verified on R4 clone"
+```
+
+---
+
+## Phase P: Integration & Cleanup (Tasks 77-80)
+
+### Task 77: 🚗 End-to-end OTA test on bench
+
+**Files:**
+- Create: `docs/v4x-bench-test-procedures.md`
+
+- [ ] **Step 1: Procedure**
+
+Repeat the full OTA wizard 5 times in sequence:
+1. Compile a v4-baseline sketch with a small change (e.g., bumped `FIRMWARE_VERSION` patch number)
+2. Install via the app's wizard
+3. Verify the new version appears in the dashboard banner
+4. Repeat 4 more times
+
+- [ ] **Step 2: Document results**
+
+```markdown
+# v4.x bench test results
+
+**Date:** YYYY-MM-DD
+
+## OTA cycle timing
+
+| Cycle | Pre-flight to 200 | Apply duration | BLE verify time | Result |
+|---|---|---|---|---|
+| 1 | … s | … s | … s | OK / FAIL |
+| 2 | … | … | … | … |
+
+## Failure modes encountered
+…
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add docs/v4x-bench-test-procedures.md
+git commit -m "test: v4.x OTA wizard end-to-end bench validation"
+```
+
+---
+
+### Task 78: 🚗 End-to-end OTA test in car
+
+**Files:**
+- Modify: `docs/v4x-bench-test-procedures.md` (add in-car section)
+
+- [ ] **Step 1: Procedure**
+
+With device installed in car (post Task 50):
+1. Engine off, ignition on (Carduino has stable power).
+2. App on phone, connected via BLE.
+3. Push a small firmware revision via the wizard.
+4. Verify dashboard reads new version after reboot.
+5. Verify all 5 sensor channels still read correctly post-update.
+6. Crank engine, verify CAN broadcast resumes and TunerStudio receives the new IDs cleanly.
+
+- [ ] **Step 2: Document. Commit.**
+
+```bash
+git add docs/v4x-bench-test-procedures.md
+git commit -m "test: v4.x OTA in-car validation"
+```
+
+---
+
+### Task 79: Cleanup — supersede Phase J + update DESIGN.md
+
+**Files:**
+- Modify: `IMPLEMENTATION-PLAN.md` (Phase J header strengthened; tasks 41-44 marked superseded)
+- Modify: `DESIGN.md` §6.4.3 (replace "future scope" placeholder with pointer to V4X-DESIGN.md)
+- Modify: `DESIGN.md` §6.5 (LED matrix maintenance patterns — replace "deferred" with actual patterns)
+
+- [ ] **Step 1: Strengthen Phase J header**
+
+Update the existing deferred-Phase-J intro at line ~3611 of IMPLEMENTATION-PLAN.md:
+
+```markdown
+## Phase J: Maintenance Mode Integration (Tasks 41-44) — SUPERSEDED by Phases L-P
+
+🛑 **The original AP-mode browser-upload approach (Tasks 41-44 below) was abandoned during the v4.x design pass (2026-05-05). The actual v4.x implementation is in Phases L-P above. Tasks 41-44 are kept for historical context but should NOT be executed.**
+```
+
+- [ ] **Step 2: Update DESIGN.md §6.4.3**
+
+Replace the v4.x-roadmap placeholder text with:
+
+```markdown
+#### 6.4.3 v4.x companion Android app
+
+Implemented in v4.x. See `V4X-DESIGN.md` for the design and `IMPLEMENTATION-PLAN.md` Phases L-P for the task breakdown.
+```
+
+- [ ] **Step 3: Update DESIGN.md §6.5**
+
+Replace each "deferred to v4.x" maintenance LED line with the actual pattern from Task 62:
+
+- "Maintenance entering: slow blink top-left corner"
+- "Wireless update ready: solid top row"
+- "Upload in progress: top row slow chase"
+- "Applying: solid top row + bottom row"   ← (or whatever the final pattern is)
+- "OTA error: solid X across matrix"
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add IMPLEMENTATION-PLAN.md DESIGN.md
+git commit -m "docs: supersede Phase J, point §6.4.3 to V4X-DESIGN, fill in §6.5 LED patterns"
+```
+
+---
+
+### Task 80: README + V4X-DESIGN.md final pass
+
+**Files:**
+- Modify: `README.md` (companion app section)
+- Modify: `V4X-DESIGN.md` (mark Implementation Complete; update §10 phasing to reference completed task numbers)
+
+- [ ] **Step 1: README**
+
+Add a v4.x section:
+
+```markdown
+## v4.x — Companion Android app
+
+Sideload the APK from the latest GitHub Release. The app provides:
+- Live BLE dashboard for the 5 sensors
+- Diagnostic actions (reboot, self-test, clear errors, view boot info, view event log)
+- Wireless firmware updates via Local-Only Hotspot + ArduinoOTA
+
+Source: `app/`. Build:
+\`\`\`
+cd app && ./gradlew assembleRelease
+\`\`\`
+```
+
+- [ ] **Step 2: Update V4X-DESIGN.md §10**
+
+Replace the rough phasing list with the actual completed-task references:
+- Phase L → done (bench prototypes verified)
+- Phase M → done (Tasks 56-62)
+- Phase N → done (Tasks 63-69)
+- Phase O → done (Tasks 70-76)
+- Phase P → in-progress / done
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add README.md V4X-DESIGN.md
+git commit -m "docs: v4.x companion app final docs"
+```
+
+---
+
+## Self-Review (v4.x)
+
+After writing the v4.x phases, I checked them against the spec at `V4X-DESIGN.md`:
+
+- **Spec coverage:**
+  - §3 system architecture — Phase M (firmware additions) + Phase N-O (app)
+  - §4.1 four screens — Tasks 66 (dashboard), 67 (picker), 69 (diagnostics), 74 (OTA wizard), 76 (USB rescue)
+  - §4.2 persistence — Task 67 (DataStore + KnownDevice schema)
+  - §4.3 BLE central — Tasks 64 (client), 65 (parser), 68 (autoreconnect)
+  - §4.4 LOH lifecycle — Task 71
+  - §4.5 OTA HTTP push — Task 73
+  - §5.1 new BLE commands — Task 58 (parser + dispatch)
+  - §5.2 banner version token — Task 59
+  - §5.3 maintenance state machine — Task 61
+  - §5.4 final CAN status frame — Task 60
+  - §5.5 no new EEPROM records — implicit (no task touches persistence)
+  - §6 OTA wire protocol — Task 73 implements client side; Task 53 verifies server side
+  - §7 failure modes — covered in Tasks 70 (size), 71 (LOH fail), 72 (mDNS timeout), 73 (HTTP errors), 74 (orchestrated failure paths)
+  - §8 USB rescue — Task 76
+  - §11 open verification items — Phase L (bench prototypes) covers the main two; remaining items are flagged in individual tasks
+- **Phase J supersession** — explicit Task 79 cleanup.
+- **Placeholder scan:** all steps have actual code or commands. A few intentional placeholders for actual measured values (Task 53 step 9 results template, Task 75 timing tuning) — these are deliberate and noted as "fill in real values" in context.
+- **Type consistency:** `MaintenanceArgs`, `MMState`, `BleState`, `DumpFrame`, `SensorReading`, `KnownDevice`, `LohSession`, `OtaStep`, `OtaResult`, `SizeCheck` consistent across tasks that reference them.
+- **Granularity:** 28 tasks across 5 phases. Phase L (3) gates the rest. Phases M-N-O are sequential within phase but Phases N and M can proceed in parallel after L. Phase P is final integration.
+- **Dependencies:**
+  - Phase L → blocks Phase M, N, O
+  - Task 56 (lib pin) → blocks Tasks 58, 61
+  - Task 57 (pct_decode + RX buffer) → blocks Task 58
+  - Task 58 → blocks Task 61 (state machine references parser)
+  - Task 59 (banner version) → blocks Task 75 (verify reads version from banner)
+  - Task 64 → blocks all other Phase N+O tasks (everything sits on the BLE client)
+  - Task 65 (parser) → blocks Task 66 (dashboard)
+  - Task 67 (persistence) → blocks Task 68 (autoconnect needs current device)
+  - Tasks 70-73 → block Task 74 (wizard composes them)
+  - Phase O complete → blocks Tasks 77-80
+
+Estimated 28 tasks, 5-7 weekends of work for someone doing this part-time. Bench prototype gate (Phase L) is ~1 weekend, the firmware side ~1-2, the Android app ~3-4.
+
+### Codex review findings (2026-05-05) — addressed in plan
+
+After the initial draft, codex did a critical pass and found 11 must-fix issues + 1 trim opportunity. All were addressed inline:
+
+1. **Task 71** now captures the LOH `Network` via `ConnectivityManager.NetworkCallback` registered before `startLocalOnlyHotspot`. `LohSession.network` is non-nullable.
+2. **Task 72** scopes mDNS to the LOH network — uses API 33+ `DiscoveryRequest.Builder().setNetwork()` on modern Android, falls back to `bindProcessToNetwork` on older.
+3. **Task 64** serializes BLE writes through `onCharacteristicWrite` callback via `LinkedBlockingQueue`. Negotiated MTU is read from `onMtuChanged`; client requests 247-byte MTU after service discovery.
+4. **Task 74** waits for `OK maintenance ...` BLE reply before delaying. ERR replies surface clean error messages.
+5. **Task 74** handles `OtaResult.NetworkError` by waiting for BLE rediscovery + banner read, distinguishing "back online" from "USB rescue needed."
+6. **Task 74 Step 4** uses a real production-firmware build (with banner version line) as the e2e verification target instead of Task 53's bare test sketch.
+7. **Task 63** added a `PermissionsGate` Compose wrapper that handles runtime grant for `BLUETOOTH_SCAN/CONNECT`, `NEARBY_WIFI_DEVICES`, `ACCESS_FINE_LOCATION` before any BLE operation.
+8. **Task 62 Step 4** added a final firmware sketch-size check with explicit cut-list if program-storage exceeds 49% (the half-flash apply boundary).
+9. **Task 61 Step 3a** added an explicit JAndrassy callback API verification step before writing the lambda registration code.
+10. **Task 74** writes `KnownDevice.lastKnownVersion` to DeviceStore after successful OTA verify (via `store.upsert(...)`).
+11. **Task 76 Step 1** added a bootloader-force verification step before shipping the USB rescue screen — proves the procedure on Matthew's specific R4 clone and documents in `bench-test-procedures.md`.
+12. **Task 67** trimmed the device-picker UI: scan-and-pick is shown only on first-run; "Forget device" is a single overflow-menu item from the dashboard. No managed-list, rename, long-press, or last-seen UI.
 
 After writing the plan, I checked it against the spec:
 
