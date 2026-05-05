@@ -120,12 +120,54 @@ static void draw_error() {
     render_frame();
 }
 
+// v4.x maintenance / OTA patterns. All confined to col 11 (the always-visible
+// strip when the MCP2515 shield is on top), since these states are mostly an
+// "I am not in normal mode" cue — the phone app is the actual UI for OTA
+// progress per V4X-DESIGN.md §9 (LED OTA progress out of scope for v1).
+
+static void draw_countdown() {
+    // MM_ARMED / MM_BLE_DRAIN / MM_WIFI_JOINING — slow 1 Hz blink at row 0
+    clear_frame();
+    if (((millis() / 500) % 2) == 0) set_pixel(11, 0, true);
+    render_frame();
+}
+
+static void draw_ap_ready() {
+    // MM_OTA_READY — solid col 11, "device is listening for OTA push"
+    clear_frame();
+    for (int r = 0; r < 8; r++) set_pixel(11, r, true);
+    render_frame();
+}
+
+static void draw_uploading() {
+    // MM_UPLOAD_APPLYING — chase down col 11 (only visible if poll() yields,
+    // which it does between the byte-batch reads inside the JAndrassy loop)
+    clear_frame();
+    int phase = (millis() / 100) % 8;
+    set_pixel(11, phase, true);
+    render_frame();
+}
+
+static void draw_applying() {
+    // MM_UPLOAD_APPLYING tail — fast strobe of full column. In practice we
+    // rarely reach DISP_APPLYING because apply() resets the chip from inside
+    // the library; included for completeness.
+    clear_frame();
+    if (((millis() / 100) % 2) == 0) {
+        for (int r = 0; r < 8; r++) set_pixel(11, r, true);
+    }
+    render_frame();
+}
+
 void DisplayUpdate() {
     switch (current_mode) {
-        case DISP_BOOT: draw_boot(); break;
-        case DISP_NORMAL: draw_normal(); break;
-        case DISP_ERROR: draw_error(); break;
-        // Other modes filled in later tasks
+        case DISP_BOOT:      draw_boot();      break;
+        case DISP_NORMAL:    draw_normal();    break;
+        case DISP_COUNTDOWN: draw_countdown(); break;
+        case DISP_AP_READY:  draw_ap_ready();  break;
+        case DISP_UPLOADING: draw_uploading(); break;
+        case DISP_APPLYING:  draw_applying();  break;
+        case DISP_ERROR:     draw_error();     break;
         default:
             matrix.clear();
             break;
