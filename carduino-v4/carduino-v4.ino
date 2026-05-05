@@ -12,8 +12,10 @@ unsigned long lastBleDumpMs = 0;
 unsigned long lastDisplayMs = 0;
 
 bool maintenanceModeActive = false;
+extern SystemHealth gSystemHealth;
 
 static unsigned long last_loop_ms = 0;
+static unsigned long loop_timing_warn_until = 0;
 
 static void check_watchdog() {
     unsigned long now = millis();
@@ -71,6 +73,7 @@ void setup() {
 }
 
 void loop() {
+    unsigned long loop_start = millis();
     check_watchdog();
     unsigned long now = millis();
 
@@ -113,4 +116,11 @@ void loop() {
     if (maintenanceModeActive) {
         // HttpServerServicePhase() — Task 42
     }
+
+    unsigned long loop_dur = millis() - loop_start;
+    if (loop_dur > 50) {
+        loop_timing_warn_until = millis() + 2000;
+        Serial.print(F("loop took ")); Serial.print(loop_dur); Serial.println(F(" ms"));
+    }
+    gSystemHealth.loop_timing_warn = (millis() < loop_timing_warn_until);
 }

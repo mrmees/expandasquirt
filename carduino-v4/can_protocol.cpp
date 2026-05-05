@@ -29,6 +29,19 @@ void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, ui
 #include "ble_console.h"
 
 static MCP2515 mcp2515(PIN_MCP2515_CS);
+SystemHealth gSystemHealth = {0};
+
+void system_health_update() {
+    uint8_t errflag = mcp2515.getErrorFlags();
+    gSystemHealth.can_busoff_active = (errflag & MCP2515::EFLG_TXBO) != 0;
+    gSystemHealth.can_errors_warning = (errflag & (MCP2515::EFLG_TXEP | MCP2515::EFLG_RXEP)) != 0;
+
+    static bool last_busoff = false;
+    if (last_busoff && !gSystemHealth.can_busoff_active) {
+        gSystemHealth.busoff_recoveries++;
+    }
+    last_busoff = gSystemHealth.can_busoff_active;
+}
 
 static bool selftest_loopback() {
     mcp2515.setLoopbackMode();
@@ -77,6 +90,7 @@ bool can_protocol_init() {
 void CanSendPhase() {
     static uint8_t seq = 0;
     gSensorState.sequence_counter = seq++;
+    system_health_update();
 
     uint8_t buf[8];
 
@@ -95,10 +109,10 @@ void CanSendPhase() {
     // bit 1: WiFi AP active (Phase J)
     // bit 2: OTA in progress (Phase J)
     if (ble_client_connected())       status_flags |= 0x08;  // bit 3: BLE client connected
-    // bit 4: CAN errors warning (Task 34)
+    if (gSystemHealth.can_errors_warning) status_flags |= 0x10;  // bit 4: CAN errors warning
     if (any_channel_flatlined())      status_flags |= 0x20;  // bit 5: any channel flatlined
-    // bit 6: loop timing warn (Task 34)
-    // bit 7: CAN bus-off active (Task 34)
+    if (gSystemHealth.loop_timing_warn)   status_flags |= 0x40;  // bit 6: loop timing warn
+    if (gSystemHealth.can_busoff_active)  status_flags |= 0x80;  // bit 7: CAN bus-off active
     uint8_t max_age = 0;
     for (int i = 0; i < 5; i++) {
         if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];

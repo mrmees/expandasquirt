@@ -11,6 +11,19 @@ extern "C" {
 bool can_protocol_init();
 void CanSendPhase();
 
+typedef struct {
+    bool can_errors_warning;       // TXEP/RXEP set per Microchip
+    bool can_busoff_active;        // TXBO set
+    uint16_t busoff_recoveries;
+    bool loop_timing_warn;         // last loop iteration > 50 ms
+} SystemHealth;
+
+extern SystemHealth gSystemHealth;
+
+// Snapshot MCP2515 error flags + edge-detect bus-off recoveries.
+// Called from CanSendPhase().
+void system_health_update();
+
 // Pack SensorState into 8-byte CAN Frame 1 payload (big-endian per design section 5.3)
 void pack_frame1(const SensorState* s, uint8_t* out8);
 
