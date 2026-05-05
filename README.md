@@ -37,7 +37,11 @@ v4 firmware updates are USB-only:
 
 Replace `COM<N>` with the R4 serial port.
 
-Wireless firmware updates are deferred to v4.x; see `DESIGN.md` section 6.4.3.
+Wireless firmware updates are deferred to v4.x. The v4.x design and
+implementation plan add an Android companion app + firmware-side maintenance
+state machine that uses the JAndrassy/ArduinoOTA library (1.1.1) for the
+HTTP-push-over-WiFi apply step. See `V4X-DESIGN.md` for the architecture and
+`IMPLEMENTATION-PLAN.md` Phases L-P for the task breakdown.
 
 ## Tests
 
@@ -54,7 +58,10 @@ Bench-side validation is documented in
 
 - [DESIGN.md](DESIGN.md) - architecture, hardware, CAN protocol, firmware
   behavior, and validation plan.
-- [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) - task-by-task build plan.
+- [V4X-DESIGN.md](V4X-DESIGN.md) - companion Android app + maintenance-mode
+  design (supersedes DESIGN.md §6.4.3).
+- [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) - task-by-task build plan
+  (Phases A-K cover v4; Phases L-P cover v4.x companion app + OTA).
 - [docs/wiring-diagram.md](docs/wiring-diagram.md) - power tree, pinout,
   sensor wiring, ADC filtering, and CAN shield notes.
 - [docs/tunerstudio-setup.md](docs/tunerstudio-setup.md) - MS3/TunerStudio CAN
