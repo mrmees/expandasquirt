@@ -1,6 +1,7 @@
 #include "display_matrix.h"
 
 #ifdef ARDUINO
+#include "sensor_pipeline.h"
 #include <Arduino.h>
 #include <Arduino_LED_Matrix.h>
 
@@ -55,9 +56,29 @@ static void draw_boot() {
     render_frame();
 }
 
+static void draw_normal() {
+    clear_frame();
+
+    // 1 Hz heartbeat in top-right corner (col 11, row 0)
+    bool hb = ((millis() / 500) % 2) == 0;
+    if (hb) set_pixel(11, 0, true);
+
+    // BLE client connected indicator in top-left (col 0, row 0)
+    // Wired in Task 24; for now, leave off.
+
+    // Bottom row: 5 sensor health LEDs (cols 0-4 of row 7)
+    for (int i = 0; i < 5; i++) {
+        bool healthy = (gSensorState.health_bitmask >> i) & 1;
+        if (healthy) set_pixel(i, 7, true);
+    }
+
+    render_frame();
+}
+
 void DisplayUpdate() {
     switch (current_mode) {
         case DISP_BOOT: draw_boot(); break;
+        case DISP_NORMAL: draw_normal(); break;
         // Other modes filled in later tasks
         default:
             matrix.clear();
