@@ -4,13 +4,19 @@
 #include "config.h"
 #include "persistent.h"
 #include "sensor_pipeline.h"
+#include "maintenance_args.h"
+#include "maintenance_mode.h"
 #include <ArduinoBLE.h>
 #include <stdio.h>
 #include <string.h>
 
 static BLEService nus_service(BLE_SERVICE_UUID);
 static BLECharacteristic tx_char(BLE_TX_CHAR_UUID, BLENotify, 20);
-static BLECharacteristic rx_char(BLE_RX_CHAR_UUID, BLEWriteWithoutResponse | BLEWrite, 64);
+// rx_char max length matches BLE_RX_BUFFER_SIZE so the v4.x maintenance command
+// (long percent-encoded line) fits in a single ATT write at higher MTUs.
+// Lower-MTU clients still get split-and-reassemble via the BleServicePhase
+// accumulator, which has always handled multi-packet writes.
+static BLECharacteristic rx_char(BLE_RX_CHAR_UUID, BLEWriteWithoutResponse | BLEWrite, BLE_RX_BUFFER_SIZE);
 
 static bool ble_ok = false;
 static bool was_connected = false;
@@ -141,9 +147,40 @@ static void cmd_help(const char* args) {
     ble_println("  boot              - reset cause, boot count, last fatal error");
     ble_println("  verbose on|off    - toggle periodic dump");
     ble_println("  reboot            - soft reset");
+    ble_println("  maintenance ...   - enter v4.x OTA mode (see V4X-DESIGN.md)");
     ble_println("  help              - this list");
     // More commands land as later tasks ship: log, reset can/ble,
-    // clear errors, selftest, maintenance/abort.
+    // clear errors, selftest.
+}
+
+// V4X §5.1: `maintenance ssid=<pct> psk=<pct> pwd=<pct>` enters MM_ARMED;
+// `maintenance abort` cancels while still armed. Real state machine in
+// maintenance_mode.cpp lands in Task 61; this dispatcher is wired now so the
+// command surface is testable.
+static void cmd_maintenance(const char* args) {
+    if (strcmp(args, "abort") == 0) {
+        maintenance_request_abort();
+        ble_println("OK maintenance aborted");
+        return;
+    }
+
+    MaintenanceArgs parsed;
+    MaintenanceParseResult r = maintenance_parse_args(args, parsed);
+    switch (r) {
+        case MaintenanceParseResult::ARG_TOO_LONG:
+            ble_println("ERR maintenance arg-too-long");
+            return;
+        case MaintenanceParseResult::BAD_ARGS:
+            ble_println("ERR maintenance bad-args");
+            return;
+        case MaintenanceParseResult::OK:
+            if (!maintenance_request_enter(parsed)) {
+                ble_println("ERR maintenance busy");
+                return;
+            }
+            ble_println("OK maintenance armed timeout=3000");
+            return;
+    }
 }
 
 bool ble_init() {
@@ -160,12 +197,13 @@ bool ble_init() {
     nus_service.addCharacteristic(rx_char);
     BLE.addService(nus_service);
 
-    ble_register_command("status",  cmd_status);
-    ble_register_command("cal",     cmd_cal);
-    ble_register_command("boot",    cmd_boot);
-    ble_register_command("reboot",  cmd_reboot);
-    ble_register_command("verbose", cmd_verbose);
-    ble_register_command("help",    cmd_help);
+    ble_register_command("status",      cmd_status);
+    ble_register_command("cal",         cmd_cal);
+    ble_register_command("boot",        cmd_boot);
+    ble_register_command("reboot",      cmd_reboot);
+    ble_register_command("verbose",     cmd_verbose);
+    ble_register_command("maintenance", cmd_maintenance);
+    ble_register_command("help",        cmd_help);
 
     BLE.advertise();
     ble_ok = true;
