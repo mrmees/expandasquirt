@@ -117,17 +117,13 @@ static void cmd_verbose(const char* args) {
 static void cmd_help(const char* args) {
     (void)args;
     ble_println("commands:");
-    ble_println("  status                - one-shot dump");
-    ble_println("  cal <ch>              - raw ADC + voltage for channel");
-    ble_println("  boot                  - last reset cause + boot count");
-    ble_println("  log / log clear       - dump or wipe event log");
-    ble_println("  reboot                - soft reset");
-    ble_println("  reset can / reset ble - reinit subsystem");
-    ble_println("  clear errors          - reset event log + sticky bits");
-    ble_println("  selftest              - rerun boot self-tests");
-    ble_println("  maintenance / abort   - enter / cancel maint mode");
-    ble_println("  verbose on / off      - debug spam");
-    ble_println("  help                  - this list");
+    ble_println("  status            - one-shot sensor dump");
+    ble_println("  cal <ch>          - raw ADC + voltage (therm1|2, pres1|2|3)");
+    ble_println("  verbose on|off    - toggle periodic dump");
+    ble_println("  reboot            - soft reset");
+    ble_println("  help              - this list");
+    // More commands land as later tasks ship: boot, log, reset can/ble,
+    // clear errors, selftest, maintenance/abort.
 }
 
 bool ble_init() {
