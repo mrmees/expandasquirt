@@ -6,6 +6,7 @@ build/
 
 # Secrets — never commit
 secrets.h
+prototypes/**/arduino_secrets.h
 
 # OS
 .DS_Store
