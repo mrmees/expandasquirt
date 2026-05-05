@@ -24,6 +24,7 @@ import can
 
 FRAME1_ID = 0x401  # engine sensors: oilT, oilP, fuelP, preP
 FRAME2_ID = 0x402  # post-SC temp + status
+RPM_FRAME_ID = 0x5E8  # MS3 dash broadcast (CAN_RX_RPM_ID), used by --inject-rpm
 
 
 def decode_frame1(data: bytes) -> str:
@@ -54,12 +55,26 @@ def main() -> None:
                     help="seconds between rate summary lines")
     ap.add_argument("--changes-only", action="store_true",
                     help="suppress per-frame output; only print when Frame 2 "
-                         "health bitmask or age changes (plus periodic summary). "
+                         "health/flags/age changes (plus periodic summary). "
                          "Useful for bench-testing health transitions.")
+    ap.add_argument("--inject-rpm", type=int, default=None, metavar="RPM",
+                    help="alongside listening, broadcast ID 0x5E8 with the "
+                         "given RPM in bytes 2-3 (BE) at 10 Hz. Drives the "
+                         "firmware's CanReceivePhase / engine_running_now "
+                         "during bench verification of Phase H.")
     args = ap.parse_args()
 
     print(f"Connecting to {args.port} @ {args.bitrate // 1000} kbps via slcan...")
     bus = can.Bus(interface="slcan", channel=args.port, bitrate=args.bitrate)
+
+    inject_msg = None
+    if args.inject_rpm is not None:
+        rpm = max(0, min(args.inject_rpm, 65535))
+        inject_data = bytes([0, 0, (rpm >> 8) & 0xFF, rpm & 0xFF, 0, 0, 0, 0])
+        inject_msg = can.Message(arbitration_id=RPM_FRAME_ID,
+                                 is_extended_id=False, data=inject_data)
+        print(f"Injecting RPM={rpm} on ID 0x{RPM_FRAME_ID:03X} at 10 Hz.")
+
     print("Listening. Ctrl+C to stop.\n")
 
     counts: dict[int, int] = defaultdict(int)
@@ -70,10 +85,24 @@ def main() -> None:
     last_health: int | None = None
     last_age: int | None = None
     last_flags: int | None = None
+    last_inject_t = 0.0
+    INJECT_PERIOD = 0.1  # 10 Hz
 
     try:
         while True:
-            msg = bus.recv(timeout=1.0)
+            # Periodic RPM inject (10 Hz). Uses a short recv timeout so we can
+            # interleave reads and sends from the same Bus instance.
+            recv_timeout = 0.05 if inject_msg is not None else 1.0
+            if inject_msg is not None:
+                now = time.monotonic()
+                if now - last_inject_t >= INJECT_PERIOD:
+                    try:
+                        bus.send(inject_msg)
+                    except Exception as e:
+                        print(f"  !! inject send failed: {e}", file=sys.stderr)
+                    last_inject_t = now
+
+            msg = bus.recv(timeout=recv_timeout)
             if msg is None:
                 # No frame this second; only complain once
                 if not no_frame_warned and time.time() - last_summary > args.summary_window:
