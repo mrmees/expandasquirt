@@ -59,7 +59,6 @@
 
 // ===== Watchdog =====
 #define WATCHDOG_NORMAL_MS       1000
-#define WATCHDOG_MAINTENANCE_MS  8000
 
 // ===== Health thresholds =====
 #define HEALTH_DEBOUNCE_BAD   3   // samples
@@ -74,10 +73,5 @@
 #define BLE_TX_CHAR_UUID      "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_CHAR_UUID      "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_BUFFER_SIZE    64
-
-// ===== AP =====
-#define AP_SSID  "CARDUINO-OTA"
-// AP_PASSWORD comes from secrets.h
-#define AP_GATEWAY_IP_LAST_OCTET  1   // 192.168.4.1
 
 #endif

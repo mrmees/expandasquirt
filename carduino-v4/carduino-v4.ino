@@ -11,7 +11,6 @@ unsigned long lastCanMs    = 0;
 unsigned long lastBleDumpMs = 0;
 unsigned long lastDisplayMs = 0;
 
-bool maintenanceModeActive = false;
 extern SystemHealth gSystemHealth;
 
 static unsigned long last_loop_ms = 0;
@@ -19,8 +18,7 @@ static unsigned long loop_timing_warn_until = 0;
 
 static void check_watchdog() {
     unsigned long now = millis();
-    unsigned long timeout = maintenanceModeActive ? WATCHDOG_MAINTENANCE_MS : WATCHDOG_NORMAL_MS;
-    if (last_loop_ms != 0 && (now - last_loop_ms) > timeout) {
+    if (last_loop_ms != 0 && (now - last_loop_ms) > WATCHDOG_NORMAL_MS) {
         // RA4M1 + Arduino Renesas core clears RSTSR before main(), so this
         // reboot reads as RESET_UNKNOWN; the boot counter still confirms it.
         Serial.println(F("WATCHDOG TIMEOUT - resetting"));
@@ -111,10 +109,6 @@ void loop() {
     if (now - lastDisplayMs >= DISPLAY_PERIOD_MS) {
         DisplayUpdate();
         lastDisplayMs = now;
-    }
-
-    if (maintenanceModeActive) {
-        // HttpServerServicePhase() — Task 42
     }
 
     unsigned long loop_dur = millis() - loop_start;
