@@ -12,6 +12,7 @@ static BLECharacteristic tx_char(BLE_TX_CHAR_UUID, BLENotify, 20);
 static BLECharacteristic rx_char(BLE_RX_CHAR_UUID, BLEWriteWithoutResponse | BLEWrite, 64);
 
 static bool ble_ok = false;
+static bool was_connected = false;
 
 struct CommandEntry {
     const char*    name;
@@ -144,6 +145,14 @@ void BleServicePhase() {
     if (!ble_ok) return;
     BLE.poll();
 
+    bool now_connected = ble_client_connected();
+    if (now_connected && !was_connected) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "CARDUINO v4 connected (uptime %lu sec)", millis() / 1000);
+        ble_println(buf);
+        ble_println("type 'help' for commands");
+    }
+
     if (rx_char.written()) {
         size_t n = rx_char.valueLength();
         const uint8_t* data = rx_char.value();
@@ -162,6 +171,8 @@ void BleServicePhase() {
             }
         }
     }
+
+    was_connected = now_connected;
 }
 
 bool ble_client_connected() {
