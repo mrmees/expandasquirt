@@ -2,7 +2,9 @@
 
 #include "ble_console.h"
 #include "config.h"
+#include "sensor_pipeline.h"
 #include <ArduinoBLE.h>
+#include <stdio.h>
 #include <string.h>
 
 static BLEService nus_service(BLE_SERVICE_UUID);
@@ -51,6 +53,27 @@ static void process_command(const char* line) {
     ble_println("unknown command - type 'help'");
 }
 
+static void format_status_line(char* out, size_t outlen) {
+    snprintf(out, outlen,
+             "[seq=%u ready=%u health=0x%02X]",
+             gSensorState.sequence_counter,
+             gSensorState.ready_flag,
+             gSensorState.health_bitmask);
+}
+
+static void format_sensor_line(char* out, size_t outlen, const char* label,
+                               uint16_t value_x10, const char* unit, uint8_t bit) {
+    bool healthy = (gSensorState.health_bitmask & bit) != 0;
+    snprintf(out, outlen, "  %-6s = %6.1f %-3s   %s",
+             label, value_x10 / 10.0f, unit,
+             healthy ? "ok" : "FAULT");
+}
+
+static void cmd_status(const char* args) {
+    (void)args;
+    BleDumpPhase();
+}
+
 bool ble_init() {
     if (!BLE.begin()) {
         Serial.println(F("BLE.begin() failed"));
@@ -64,6 +87,8 @@ bool ble_init() {
     nus_service.addCharacteristic(tx_char);
     nus_service.addCharacteristic(rx_char);
     BLE.addService(nus_service);
+
+    ble_register_command("status", cmd_status);
 
     BLE.advertise();
     ble_ok = true;
@@ -115,6 +140,22 @@ void ble_println(const char* msg) {
 }
 
 void BleDumpPhase() {
+    if (!ble_ok || !ble_client_connected()) return;
+
+    char buf[64];
+    format_status_line(buf, sizeof(buf));
+    ble_println(buf);
+
+    format_sensor_line(buf, sizeof(buf), "oilT",  gSensorState.oil_temp_F_x10,         "F",   0x01);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "postT", gSensorState.post_sc_temp_F_x10,     "F",   0x02);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "oilP",  gSensorState.oil_pressure_psi_x10,   "PSI", 0x04);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "fuelP", gSensorState.fuel_pressure_psi_x10,  "PSI", 0x08);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "preP",  gSensorState.pre_sc_pressure_kpa_x10, "kPa", 0x10);
+    ble_println(buf);
 }
 
 #endif

@@ -78,7 +78,7 @@ void loop() {
     BleServicePhase();
 
     if (now - lastBleDumpMs >= BLE_PERIOD_MS) {
-        // BleDumpPhase() — Task 26
+        BleDumpPhase();
         lastBleDumpMs = now;
     }
 
