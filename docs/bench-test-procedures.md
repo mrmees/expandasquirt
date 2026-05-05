@@ -216,6 +216,29 @@ the v4 release.
 Pass criteria:
 - Not applicable for v4.
 
+## 1.x Test results (2026-05-05)
+
+All Phase 1 tests run on the bench at desk-mounted hardware (R4 + MCP2515 stack + 3 of the 5 sensors on bench leads — Bosch MAP on A4, NTC + 9.7 kΩ pull-up on A0, 5-bar absolute oil pressure sender on A2; A1 and A3 not connected).
+
+| Test | Result | Notes |
+|---|---|---|
+| 1.1 Smoke test | PASS | No anomalies, idle current < 0.5 A (below meter resolution; baseline acceptable) |
+| 1.2 Boot self-test | PASS | Forced ERR02 via temp `can_protocol_init() return false` produced "02" on the LED matrix; production restored |
+| 1.3 Sensor pipeline | PASS w/ caveat | A0 NTC pinch test responsive; A4 MAP suck test responsive; A2 oil pressure pipeline ran but conversion math wrong → fixed in Task 51 (commit e2b654f) |
+| 1.4 Thermistor curves | PASS w/ caveat | Room temp 82.2 °F vs 80.8 °F reference (+1.4 °F, within ±2 °F). Ice bath read 40-41 °F vs 32 °F nominal — analysis indicated bath was actually around 37-43 °F (bath setup limitation, not sensor); operating range 150-250 °F not directly verified but Beta=3950 fits the upper-table region of the OEM curve |
+| 1.5 CAN frame inspection | PASS | IDs 0x401 + 0x402 at ~16 Hz, DLC=8, byte layout matches §5.3 exactly, 8-bit sequence counter wraps cleanly. RX gate verified: 0x5E8 RPM injection at 2000 RPM caused the health bitmask to change (0x0C → 0x05), evidencing engine-running gating |
+| 1.6 Watchdog | PASS | Forced 2 s `delay()` after `check_watchdog()` produced the expected `WATCHDOG TIMEOUT - resetting` print, R4 reset, and clean Boot # increments (21 → 22 → 23 → 24). Reset cause read as 4 (meaningful, not the UNKNOWN the previous handoff predicted) |
+| 1.7 OTA | DEFERRED | Out of v4 scope per `DESIGN.md` §6.4.3 |
+| 1.8 Persistent state | PASS | Boot counter increments cleanly across the watchdog-driven resets in 1.6; no EEPROM re-init message seen; magic intact |
+
+Deferred fix raised: Task 51 (oil pressure conversion for 5-bar absolute sender) — completed in commit `e2b654f`, bench-verified to read 0.0 PSI at atmospheric.
+
+Open items NOT addressed in this Phase 1 pass:
+- Fuel pressure sender (A3) and post-supercharger thermistor (A1) were not on the bench. Their channels read floating values during the test. Bench-validation for those two sensors deferred until they are physically present.
+- Boot banner serial capture proved unreliable due to USB CDC re-enumeration timing on the Renesas R4. Captured indirectly via the watchdog reboot loop in 1.6. Not a firmware issue; documented for future test runs.
+
+---
+
 ## 1.8 Persistent state
 
 Purpose: verify persistent boot state survives resets.
