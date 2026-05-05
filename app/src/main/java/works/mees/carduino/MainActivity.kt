@@ -29,6 +29,8 @@ import works.mees.carduino.persistence.DeviceStore
 import works.mees.carduino.ui.DashboardScreen
 import works.mees.carduino.ui.DashboardViewModel
 import works.mees.carduino.ui.DevicePickerScreen
+import works.mees.carduino.ui.DiagnosticsScreen
+import works.mees.carduino.ui.DiagnosticsViewModel
 import works.mees.carduino.ui.PermissionsGate
 
 /**
@@ -114,15 +116,39 @@ class MainActivity : ComponentActivity() {
                                 )
                                 DashboardScreen(
                                     vm = dashboardViewModel,
-                                    // TODO: wire up in Task 69 / Task 73.
                                     onMenuFirmwareUpdate = {},
-                                    onMenuDiagnostics = {},
+                                    onMenuDiagnostics = { nav.navigate("diag") },
                                     onForget = {
                                         dashboardViewModel.forgetCurrent()
                                         nav.navigate("picker") {
                                             popUpTo(0) { inclusive = true }
                                         }
                                     },
+                                )
+                            }
+                            composable("diag") {
+                                val diagVm: DiagnosticsViewModel = viewModel(
+                                    factory = object : ViewModelProvider.Factory {
+                                        @Suppress("UNCHECKED_CAST")
+                                        override fun <T : ViewModel> create(
+                                            modelClass: Class<T>,
+                                        ): T {
+                                            if (
+                                                modelClass.isAssignableFrom(
+                                                    DiagnosticsViewModel::class.java,
+                                                )
+                                            ) {
+                                                return DiagnosticsViewModel(ble) as T
+                                            }
+                                            throw IllegalArgumentException(
+                                                "Unknown ViewModel class: ${modelClass.name}",
+                                            )
+                                        }
+                                    },
+                                )
+                                DiagnosticsScreen(
+                                    vm = diagVm,
+                                    onBack = { nav.popBackStack() },
                                 )
                             }
                         }
