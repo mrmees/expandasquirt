@@ -74,6 +74,24 @@ static void cmd_status(const char* args) {
     BleDumpPhase();
 }
 
+static void cmd_cal(const char* args) {
+    char buf[64];
+    int pin = -1;
+    if      (strcmp(args, "therm1") == 0) pin = PIN_OIL_TEMP;
+    else if (strcmp(args, "therm2") == 0) pin = PIN_POST_SC_TEMP;
+    else if (strcmp(args, "pres1")  == 0) pin = PIN_OIL_PRESS;
+    else if (strcmp(args, "pres2")  == 0) pin = PIN_FUEL_PRESS;
+    else if (strcmp(args, "pres3")  == 0) pin = PIN_PRE_SC_PRESS;
+    else {
+        ble_println("usage: cal <therm1|therm2|pres1|pres2|pres3>");
+        return;
+    }
+    int raw = analogRead(pin);
+    float v = (raw / (float)ADC_MAX_COUNT) * V_REF;
+    snprintf(buf, sizeof(buf), "  raw=%d  voltage=%.3fV", raw, v);
+    ble_println(buf);
+}
+
 bool ble_init() {
     if (!BLE.begin()) {
         Serial.println(F("BLE.begin() failed"));
@@ -89,6 +107,7 @@ bool ble_init() {
     BLE.addService(nus_service);
 
     ble_register_command("status", cmd_status);
+    ble_register_command("cal", cmd_cal);
 
     BLE.advertise();
     ble_ok = true;
