@@ -6526,14 +6526,16 @@ git commit -m "feat: SAF file picker + size validation with unit tests"
 
 ---
 
-### Task 71: 🔧 LocalOnlyHotspot lifecycle with Network capture
+### Task 71: 🔧 LocalOnlyHotspot lifecycle with Network capture and forced WPA2
 
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ota/LohManager.kt`
 
-**Why both LOH callback + ConnectivityManager:** the LOH reservation gives us SSID/passphrase but not the underlying `Network` object. Task 73 needs the `Network` to scope OkHttp's socketFactory so the HTTP request actually goes through the LOH AP rather than cellular. We capture the Network via a `NetworkCallback` filtered for `TRANSPORT_WIFI + NET_CAPABILITY_NOT_VPN` registered alongside LOH start.
+**Why both LOH callback + ConnectivityManager:** the LOH reservation gives us SSID/passphrase but not the underlying `Network` object. Task 73 needs the `Network` to scope OkHttp's socketFactory so the HTTP request actually goes through the LOH AP rather than cellular. We capture the Network via a `NetworkCallback` filtered for `TRANSPORT_WIFI + !NET_CAPABILITY_INTERNET` registered alongside LOH start.
 
-- [ ] **Step 1: Implementation with linked NetworkCallback**
+**Why explicit WPA2-Personal in the SoftApConfiguration:** Phase L Task 53 bench (2026-05-05) found the R4's connectivity firmware 0.6.0 cannot reliably join an AP in WPA2/WPA3 transition mode (the Pixel 8's default for the regular mobile hotspot). Plain WPA2-Personal works. The system-default LOH security may follow the same OS default, so we force `SECURITY_TYPE_WPA2_PSK` via the API 30+ `startLocalOnlyHotspot(config, executor, callback)` overload. See `prototypes/ota_arduinoota/README.md` for the bench notes and V4X-DESIGN.md §4.4 / §7 / §11.
+
+- [ ] **Step 1: Implementation with linked NetworkCallback and forced WPA2 LOH config**
 
 ```kotlin
 // LohManager.kt
@@ -6542,14 +6544,17 @@ package works.mees.carduino.ota
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.random.Random
 
 data class LohSession(
     val ssid: String,
@@ -6565,7 +6570,19 @@ data class LohSession(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
+private fun buildLohConfig(): SoftApConfiguration {
+    // 16-char random passphrase, alphanumeric, fits WPA2 8..63 byte requirement
+    val charset = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    val passphrase = (1..16).map { charset.random() }.joinToString("")
+
+    return SoftApConfiguration.Builder()
+        .setPassphrase(passphrase, SoftApConfiguration.SECURITY_TYPE_WPA2_PSK)
+        // Don't override SSID — let the system pick (typically AndroidShare_NNNN)
+        // Don't pin a band — let the system choose based on what works
+        .build()
+}
+
+@RequiresApi(Build.VERSION_CODES.R)  // API 30+ for the config-taking overload
 @SuppressLint("MissingPermission")
 suspend fun startLoh(ctx: Context): LohSession? {
     val wifi = ctx.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -6588,14 +6605,20 @@ suspend fun startLoh(ctx: Context): LohSession? {
         .build()
     cm.registerNetworkCallback(req, networkCallback)
 
-    // Step B: start LOH
+    // Step B: start LOH with explicit WPA2-PSK config
     val reservationDeferred = CompletableDeferred<WifiManager.LocalOnlyHotspotReservation?>()
     val lohCb = object : WifiManager.LocalOnlyHotspotCallback() {
         override fun onStarted(r: WifiManager.LocalOnlyHotspotReservation) { reservationDeferred.complete(r) }
         override fun onStopped() {}
-        override fun onFailed(reason: Int) { reservationDeferred.complete(null) }
+        override fun onFailed(reason: Int) {
+            // reason values:
+            //   ERROR_NO_CHANNEL=0, ERROR_GENERIC=1, ERROR_INCOMPATIBLE_MODE=2, ERROR_TETHERING_DISALLOWED=3
+            // ERROR_GENERIC is what we'd see if the OEM rejected the explicit config.
+            reservationDeferred.complete(null)
+        }
     }
-    wifi.startLocalOnlyHotspot(lohCb, null)
+    val config = buildLohConfig()
+    wifi.startLocalOnlyHotspot(config, /* executor */ java.util.concurrent.Executors.newSingleThreadExecutor(), lohCb)
 
     val reservation = withTimeoutOrNull(15_000) { reservationDeferred.await() }
     if (reservation == null) {
@@ -6623,19 +6646,25 @@ suspend fun startLoh(ctx: Context): LohSession? {
 }
 ```
 
-- [ ] **Step 2: Bench-test that the captured Network is the LOH one**
+- [ ] **Step 2: Bench-test that the captured Network is the LOH one AND that the WPA2 config was honored**
 
-Add a temporary debug button to call `startLoh()`, log SSID + passphrase + `network.toString()`. Connect a laptop to the hotspot. Then verify: `network.getAllByName("192.168.43.1")` resolves on that Network (laptop is the only client; should be reachable). If `network` ends up being some other WiFi network, the capability filter is wrong and needs adjusting.
+Add a temporary debug button to call `startLoh()`, log SSID + passphrase + `network.toString()`. Two important checks:
 
-- [ ] **Step 3: Document any OEM quirks observed in `prototypes/loh_android/notes-results.md`**
+1. **Verify the LOH actually came up with WPA2:** point the R4 listener (`prototypes/ota_arduinoota/jandrassy_proto/`) at the LOH SSID + passphrase, flash, observe whether it joins. If it joins → WPA2 config honored. If it times out → either OEM rejected the config or LOH downgraded to transition mode silently. In the latter case, `onFailed(reason)` should have fired and we'd never get this far — so a successful `onStarted` followed by an R4-can't-join is the signature of an OEM silently downgrading. Document the failure mode.
+2. **Verify the captured Network is the LOH one:** connect a laptop to the LOH and confirm `network.getAllByName("<gateway-ip>")` resolves via that Network specifically. If `network` ends up being some other WiFi network, the capability filter is wrong and needs adjusting.
 
-Specifically note whether `NET_CAPABILITY_INTERNET` is removed or present on the S25+'s LOH — if present, remove the `removeCapability` line and instead disambiguate by SSID match.
+- [ ] **Step 3: Document OEM quirks observed in `prototypes/loh_android/notes-results.md`**
+
+Specifically note:
+- Whether `NET_CAPABILITY_INTERNET` is removed or present on the Pixel 8's LOH — if present, remove the `removeCapability` line and instead disambiguate by SSID match.
+- Whether the explicit `SECURITY_TYPE_WPA2_PSK` config in `buildLohConfig()` was honored (`reservation.softApConfiguration.securityType` should equal `SECURITY_TYPE_WPA2_PSK`).
+- If WPA2 was NOT honored: the v1 design becomes blocked. We'd need to revisit cutting the manual-hotspot fallback (V4X-DESIGN.md §9 lists it as deferred; this would motivate moving it back into v1).
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add app/src/main/java/works/mees/carduino/ota/LohManager.kt prototypes/loh_android/notes-results.md
-git commit -m "feat: LocalOnlyHotspot with ConnectivityManager Network capture for OkHttp scoping"
+git commit -m "feat: LocalOnlyHotspot with WPA2-forced config, Network capture for OkHttp scoping"
 ```
 
 ---
