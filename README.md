@@ -21,8 +21,20 @@ wiring details.
 
 ## Build
 
+Plain build (FIRMWARE_BUILD = "unknown"):
 ```powershell
 & "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+```
+
+Build with git-sha stamp (recommended for any build that may be OTA-pushed —
+the BLE banner exposes `FIRMWARE_BUILD` so the v4.x companion app can verify
+which firmware is running post-update; per V4X-DESIGN.md §5.2):
+```bash
+GIT_SHA=$(git rev-parse --short HEAD)
+"/c/Program Files/Arduino CLI/arduino-cli.exe" compile \
+    --fqbn arduino:renesas_uno:unor4wifi \
+    --build-property "build.extra_flags=-DGIT_SHORT_SHA=$GIT_SHA" \
+    carduino-v4/
 ```
 
 Pinned board and library versions are listed in [libraries.txt](libraries.txt).

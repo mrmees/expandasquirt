@@ -217,8 +217,12 @@ void BleServicePhase() {
 
     bool now_connected = ble_client_connected();
     if (now_connected && !was_connected) {
+        // First line is parseable by the v4.x companion app to verify the
+        // running firmware version after an OTA. Format pinned in V4X-DESIGN.md §5.2.
+        ble_println("CARDUINO-v4 version=" FIRMWARE_VERSION " build=" FIRMWARE_BUILD);
+
         char buf[64];
-        snprintf(buf, sizeof(buf), "CARDUINO v4 connected (uptime %lu sec)", millis() / 1000);
+        snprintf(buf, sizeof(buf), "connected (uptime %lu sec)", millis() / 1000);
         ble_println(buf);
         ble_println("type 'help' for commands");
     }
