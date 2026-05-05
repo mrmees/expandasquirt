@@ -13,6 +13,21 @@ unsigned long lastDisplayMs = 0;
 
 bool maintenanceModeActive = false;
 
+static unsigned long last_loop_ms = 0;
+
+static void check_watchdog() {
+    unsigned long now = millis();
+    unsigned long timeout = maintenanceModeActive ? WATCHDOG_MAINTENANCE_MS : WATCHDOG_NORMAL_MS;
+    if (last_loop_ms != 0 && (now - last_loop_ms) > timeout) {
+        // RA4M1 + Arduino Renesas core clears RSTSR before main(), so this
+        // reboot reads as RESET_UNKNOWN; the boot counter still confirms it.
+        Serial.println(F("WATCHDOG TIMEOUT - resetting"));
+        delay(50);
+        NVIC_SystemReset();
+    }
+    last_loop_ms = now;
+}
+
 void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 3000) { /* wait briefly for USB */ }
@@ -56,6 +71,7 @@ void setup() {
 }
 
 void loop() {
+    check_watchdog();
     unsigned long now = millis();
 
     if (now - lastSensorMs >= SENSOR_PERIOD_MS) {
