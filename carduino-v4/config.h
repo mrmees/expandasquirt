@@ -73,6 +73,10 @@
 #define BLE_SERVICE_UUID      "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_TX_CHAR_UUID      "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_CHAR_UUID      "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
-#define BLE_RX_BUFFER_SIZE    64
+// 256 bytes (was 64) so the v4.x `maintenance ssid=<pct> psk=<pct> pwd=<pct>`
+// command fits even with all three values percent-encoded near max length
+// (32+63+32 raw chars = 127, ~3x for worst-case pct = ~380 — capped by
+// per-field validation in maintenance_args.cpp). See V4X-DESIGN.md §5.1.
+#define BLE_RX_BUFFER_SIZE    256
 
 #endif
