@@ -19,7 +19,7 @@
 // ===== Loop scheduling (Hz) =====
 #define SENSOR_HZ      100
 #define CAN_SEND_HZ    10
-#define BLE_DUMP_HZ    5
+#define BLE_DUMP_HZ    1
 #define DISPLAY_HZ     10
 #define SENSOR_PERIOD_MS  (1000 / SENSOR_HZ)
 #define CAN_PERIOD_MS     (1000 / CAN_SEND_HZ)

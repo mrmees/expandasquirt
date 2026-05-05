@@ -211,20 +211,36 @@ void ble_println(const char* msg) {
 }
 
 // Internal dump body. Caller is responsible for connection/verbose gating.
+// Single-line packed format optimized for human reading at 1 Hz cadence:
+//   [..XX.] oilT=58.1F postT=63.6F oilP=66.2psi fuelP=66.4psi preP=26.7kPa  flat=Y age=15 seq=141
+// The 5-char [hHhh.] prefix is positional: dot=healthy, X=any-fault, in
+// channel order (oilT, postT, oilP, fuelP, preP). 'flat=Y' suffix appears
+// only when at least one channel is flatlined. 'age' is max held-value age
+// across channels, in 100 ms units (saturates at 25.5 s).
 static void do_sensor_dump() {
-    char buf[64];
-    format_status_line(buf, sizeof(buf));
-    ble_println(buf);
+    char hbits[6];
+    for (int i = 0; i < 5; i++) {
+        hbits[i] = (gSensorState.health_bitmask & (1 << i)) ? '.' : 'X';
+    }
+    hbits[5] = '\0';
 
-    format_sensor_line(buf, sizeof(buf), "oilT",  gSensorState.oil_temp_F_x10,         "F",   0x01);
-    ble_println(buf);
-    format_sensor_line(buf, sizeof(buf), "postT", gSensorState.post_sc_temp_F_x10,     "F",   0x02);
-    ble_println(buf);
-    format_sensor_line(buf, sizeof(buf), "oilP",  gSensorState.oil_pressure_psi_x10,   "PSI", 0x04);
-    ble_println(buf);
-    format_sensor_line(buf, sizeof(buf), "fuelP", gSensorState.fuel_pressure_psi_x10,  "PSI", 0x08);
-    ble_println(buf);
-    format_sensor_line(buf, sizeof(buf), "preP",  gSensorState.pre_sc_pressure_kpa_x10, "kPa", 0x10);
+    uint8_t max_age = 0;
+    for (int i = 0; i < 5; i++) {
+        if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];
+    }
+
+    char buf[128];
+    snprintf(buf, sizeof(buf),
+             "[%s] oilT=%.1fF postT=%.1fF oilP=%.1fpsi fuelP=%.1fpsi preP=%.1fkPa%s age=%u seq=%u",
+             hbits,
+             gSensorState.oil_temp_F_x10        / 10.0f,
+             gSensorState.post_sc_temp_F_x10    / 10.0f,
+             gSensorState.oil_pressure_psi_x10  / 10.0f,
+             gSensorState.fuel_pressure_psi_x10 / 10.0f,
+             gSensorState.pre_sc_pressure_kpa_x10 / 10.0f,
+             any_channel_flatlined() ? "  flat=Y" : "",
+             (unsigned)max_age,
+             (unsigned)gSensorState.sequence_counter);
     ble_println(buf);
 }
 
