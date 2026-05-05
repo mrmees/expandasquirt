@@ -50,6 +50,25 @@ void persistent_record_boot(ResetCause cause) {
     save_to_eeprom();
 }
 
+// KNOWN LIMITATION (2026-05): the Arduino Renesas core's startup code clears
+// the RSTSR0/1 reset-cause bits before main() runs, so by the time we read
+// here in setup() the registers are zero for almost every boot path.
+//
+// Bench observations:
+//   - Cold power-cycle (unplug USB, wait, replug) → reads UNKNOWN (expected POWER_ON)
+//   - 'reboot' command → NVIC_SystemReset → reads UNKNOWN (expected SOFT_RESET)
+//   - Right after arduino-cli flash → reads SOFT_RESET (works because the
+//     upload-induced soft reset happens close enough to startup that the
+//     bits haven't been fully cleared by the time main() runs)
+//
+// Boot counter remains reliable (incrementing every boot), which is the
+// load-bearing functionality. Reset cause is best-effort.
+//
+// To get reliable reset cause detection on RA4M1 with Arduino, we'd need
+// either: (a) a static C++ constructor that runs before main and snapshots
+// RSTSR, (b) overriding the core's startup hook, or (c) an EEPROM-based
+// "I'm about to soft reset / watchdog about to fire" hint. Defer until/if
+// reset-cause detection becomes load-bearing.
 ResetCause read_reset_cause() {
     volatile uint8_t* RSTSR0 = (volatile uint8_t*)0x4001E410;
     volatile uint8_t* RSTSR1 = (volatile uint8_t*)0x4001E0C0;
