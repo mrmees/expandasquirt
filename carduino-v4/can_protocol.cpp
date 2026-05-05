@@ -26,6 +26,7 @@ void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, ui
 
 #include <SPI.h>
 #include <mcp2515.h>
+#include "ble_console.h"
 
 static MCP2515 mcp2515(PIN_MCP2515_CS);
 
@@ -89,8 +90,15 @@ void CanSendPhase() {
     mcp2515.sendMessage(&f1);
 
     // Frame 2
-    uint8_t status_flags = gSensorState.ready_flag ? 0x01 : 0x00;
-    if (any_channel_flatlined()) status_flags |= 0x20;  // bit 5: flatline
+    uint8_t status_flags = 0;
+    if (gSensorState.ready_flag)      status_flags |= 0x01;  // bit 0: ready
+    // bit 1: WiFi AP active (Phase J)
+    // bit 2: OTA in progress (Phase J)
+    if (ble_client_connected())       status_flags |= 0x08;  // bit 3: BLE client connected
+    // bit 4: CAN errors warning (Task 34)
+    if (any_channel_flatlined())      status_flags |= 0x20;  // bit 5: any channel flatlined
+    // bit 6: loop timing warn (Task 34)
+    // bit 7: CAN bus-off active (Task 34)
     uint8_t max_age = 0;
     for (int i = 0; i < 5; i++) {
         if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];
