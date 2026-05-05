@@ -27,6 +27,7 @@ void persistent_init();
 const PersistentState* persistent_get();
 void persistent_set_fatal_err(uint8_t err);
 void persistent_record_boot(ResetCause cause);
+ResetCause read_reset_cause();
 
 #ifdef __cplusplus
 }

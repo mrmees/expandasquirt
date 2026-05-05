@@ -2,6 +2,7 @@
 
 #include "ble_console.h"
 #include "config.h"
+#include "persistent.h"
 #include "sensor_pipeline.h"
 #include <ArduinoBLE.h>
 #include <stdio.h>
@@ -107,6 +108,19 @@ static void cmd_reboot(const char* args) {
     NVIC_SystemReset();
 }
 
+static void cmd_boot(const char* args) {
+    (void)args;
+    char buf[64];
+    const PersistentState* s = persistent_get();
+    const char* cause_names[] = {
+        "UNKNOWN", "POWER_ON", "WATCHDOG", "BROWNOUT", "SOFT_RESET"
+    };
+    int idx = (s->last_reset_cause <= 4) ? s->last_reset_cause : 0;
+    snprintf(buf, sizeof(buf), "boot=%u reset=%s last_err=%u",
+             s->boot_counter, cause_names[idx], s->last_fatal_err);
+    ble_println(buf);
+}
+
 static void cmd_verbose(const char* args) {
     if (strcmp(args, "on") == 0) {
         verbose_enabled = true;
@@ -124,10 +138,11 @@ static void cmd_help(const char* args) {
     ble_println("commands:");
     ble_println("  status            - one-shot sensor dump");
     ble_println("  cal <ch>          - raw ADC + voltage (therm1|2, pres1|2|3)");
+    ble_println("  boot              - reset cause, boot count, last fatal error");
     ble_println("  verbose on|off    - toggle periodic dump");
     ble_println("  reboot            - soft reset");
     ble_println("  help              - this list");
-    // More commands land as later tasks ship: boot, log, reset can/ble,
+    // More commands land as later tasks ship: log, reset can/ble,
     // clear errors, selftest, maintenance/abort.
 }
 
@@ -147,6 +162,7 @@ bool ble_init() {
 
     ble_register_command("status",  cmd_status);
     ble_register_command("cal",     cmd_cal);
+    ble_register_command("boot",    cmd_boot);
     ble_register_command("reboot",  cmd_reboot);
     ble_register_command("verbose", cmd_verbose);
     ble_register_command("help",    cmd_help);

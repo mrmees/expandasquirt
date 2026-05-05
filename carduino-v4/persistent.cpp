@@ -50,4 +50,15 @@ void persistent_record_boot(ResetCause cause) {
     save_to_eeprom();
 }
 
+ResetCause read_reset_cause() {
+    volatile uint8_t* RSTSR0 = (volatile uint8_t*)0x4001E410;
+    volatile uint8_t* RSTSR1 = (volatile uint8_t*)0x4001E0C0;
+
+    if (*RSTSR0 & 0x01) return RESET_POWER_ON;
+    if (*RSTSR0 & 0x02) return RESET_BROWNOUT;
+    if (*RSTSR1 & 0x01) return RESET_WATCHDOG;
+    if (*RSTSR1 & 0x04) return RESET_SOFT;
+    return RESET_UNKNOWN;
+}
+
 #endif

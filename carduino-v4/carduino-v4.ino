@@ -4,6 +4,7 @@
 #include "sensor_pipeline.h"
 #include "self_tests.h"
 #include "ble_console.h"
+#include "persistent.h"
 
 unsigned long lastSensorMs = 0;
 unsigned long lastCanMs    = 0;
@@ -22,6 +23,12 @@ void setup() {
     display_init();
     display_set_mode(DISP_BOOT);
     sensor_pipeline_init();
+
+    persistent_init();
+    ResetCause cause = read_reset_cause();
+    persistent_record_boot(cause);
+    Serial.print(F("Boot #")); Serial.print(persistent_get()->boot_counter);
+    Serial.print(F(" reset cause=")); Serial.println(cause);
 
     ErrCode boot_err = run_boot_self_tests();
     if (boot_err == ERR_ADC) {
