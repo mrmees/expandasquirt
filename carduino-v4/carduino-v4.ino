@@ -3,6 +3,7 @@
 #include "display_matrix.h"
 #include "sensor_pipeline.h"
 #include "self_tests.h"
+#include "ble_console.h"
 
 unsigned long lastSensorMs = 0;
 unsigned long lastCanMs    = 0;
@@ -33,6 +34,11 @@ void setup() {
     }
     if (boot_err == ERR_CAN) {
         display_set_error(2);  // ERR02 - degraded mode, do not halt
+    }
+
+    if (!ble_init()) {
+        display_set_error(3);
+        Serial.println(F("BLE init failed - continuing degraded"));
     }
 
     if (boot_err == ERR_NONE) {
@@ -69,7 +75,7 @@ void loop() {
 
     // CanReceivePhase() — Task 36
 
-    // BleServicePhase() — Task 24
+    BleServicePhase();
 
     if (now - lastBleDumpMs >= BLE_PERIOD_MS) {
         // BleDumpPhase() — Task 26
