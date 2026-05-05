@@ -4,22 +4,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import works.mees.carduino.ble.CarduinoBleClient
+import works.mees.carduino.ui.DashboardScreen
+import works.mees.carduino.ui.DashboardViewModel
 import works.mees.carduino.ui.PermissionsGate
 
 /**
- * App entry. Wraps content in a runtime-permission gate per V4X-DESIGN.md
- * §4.3 / IMPLEMENTATION-PLAN.md Task 63 step 4 — BLE scan/connect and
- * NearbyWifiDevices need user-granted runtime permissions on Android 12+.
- *
- * Phase N tasks 64-69 fill in the real screens (DevicePicker, Dashboard,
- * Diagnostics). For now this is just a placeholder so the project builds
- * and installs cleanly.
+ * App entry. Wraps content in a runtime-permission gate before hosting the
+ * dashboard screen; device selection and auto-connect land in Task 67.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,19 +26,29 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     PermissionsGate {
-                        Placeholder()
+                        val dashboardViewModel: DashboardViewModel = viewModel(
+                            factory = object : ViewModelProvider.Factory {
+                                @Suppress("UNCHECKED_CAST")
+                                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                    if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
+                                        return DashboardViewModel(
+                                            CarduinoBleClient(applicationContext),
+                                        ) as T
+                                    }
+                                    throw IllegalArgumentException(
+                                        "Unknown ViewModel class: ${modelClass.name}",
+                                    )
+                                }
+                            },
+                        )
+                        DashboardScreen(
+                            vm = dashboardViewModel,
+                            onMenuFirmwareUpdate = {},
+                            onMenuDiagnostics = {},
+                        )
                     }
                 }
             }
         }
     }
-}
-
-@androidx.compose.runtime.Composable
-private fun Placeholder() {
-    Text(
-        text = "Carduino — scaffolding online.\n\nPhase N screens land in upcoming tasks (BLE central, dashboard, device picker, diagnostics, OTA wizard).",
-        modifier = Modifier.padding(16.dp),
-        style = MaterialTheme.typography.bodyLarge,
-    )
 }
