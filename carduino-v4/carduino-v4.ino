@@ -1,5 +1,6 @@
 #include "config.h"
 #include "can_protocol.h"
+#include "display_matrix.h"
 #include "sensor_pipeline.h"
 #include "self_tests.h"
 
@@ -17,6 +18,8 @@ void setup() {
     Serial.println(F("CARDUINO v4 booting..."));
 
     analogReadResolution(ADC_RESOLUTION_BITS);
+    display_init();
+    display_set_mode(DISP_BOOT);
     sensor_pipeline_init();
 
     ErrCode boot_err = run_boot_self_tests();
@@ -24,6 +27,8 @@ void setup() {
         Serial.println(F("Halting on ADC failure"));
         while (1) delay(1000);  // halt; LED matrix display lands in Task 22
     }
+
+    display_set_mode(DISP_NORMAL);
 
     // Phases will be initialized as they are added in subsequent tasks
 }
@@ -63,7 +68,7 @@ void loop() {
     }
 
     if (now - lastDisplayMs >= DISPLAY_PERIOD_MS) {
-        // DisplayUpdate() — Task 23
+        DisplayUpdate();
         lastDisplayMs = now;
     }
 
