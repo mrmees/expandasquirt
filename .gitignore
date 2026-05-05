@@ -24,3 +24,6 @@ arduino-cli.local.yaml
 # Host-side test build artifacts
 tests/test_runner
 tests/test_runner.exe
+
+# Session handoff doc — transient, not part of production source
+HANDOFF.md
