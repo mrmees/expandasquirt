@@ -8,6 +8,9 @@ build/
 secrets.h
 prototypes/**/arduino_secrets.h
 
+# Prototype-local upstream source caches (research scratch)
+prototypes/**/.tmp/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -28,3 +31,6 @@ tests/test_runner.exe
 
 # Session handoff doc — transient, not part of production source
 HANDOFF.md
+
+# Brainstorm/visual companion artifacts (transient session content)
+.superpowers/
