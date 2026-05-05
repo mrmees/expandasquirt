@@ -13,6 +13,7 @@ TEST_CASE(harness_sanity) {
 #include "test_sensor_pipeline.cpp"
 #include "test_can_protocol.cpp"
 #include "test_sensor_health.cpp"
+#include "test_pct_decode.cpp"
 
 int main() {
     printf("Tests complete: %d passed, %d failed\n", g_test_passed, g_test_failed);
