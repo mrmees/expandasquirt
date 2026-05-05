@@ -75,6 +75,11 @@ bool can_protocol_init() {
         Serial.println(F("MCP2515 setBitrate failed"));
         return false;
     }
+    // Hardware filter: accept only CAN_RX_RPM_ID (1512 / 0x5E8 per design section 5) on RX.
+    mcp2515.setFilterMask(MCP2515::MASK0, false, 0x7FF);
+    mcp2515.setFilter(MCP2515::RXF0, false, CAN_RX_RPM_ID);
+    mcp2515.setFilterMask(MCP2515::MASK1, false, 0x7FF);
+    mcp2515.setFilter(MCP2515::RXF2, false, CAN_RX_RPM_ID);
     if (!selftest_loopback()) {
         Serial.println(F("MCP2515 loopback self-test failed"));
         return false;
