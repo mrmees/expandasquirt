@@ -4256,6 +4256,23 @@ User accepts the ~54 PSI clip ceiling — sender is for low-side oil pressure mo
 
 If the fuel pressure sender is the same family, apply the same fix to that channel too. (Pending — Matthew didn't have the fuel pressure sender on the bench during 1.3.)
 
+### Task 52: Recalibrate post-SC NTC curve (R25 / Beta) for actual GM IAT
+
+Discovered during follow-on Test 1.3 (2026-05-05). After Task 51 wrapped, Matthew wired up his GM-style open-element IAT sensor on A1 with a 2.2 kΩ pull-up. The pipeline runs and responds to thermal stimulus (finger-warming raises postT, blowing cools it). However, at room temp the channel reads ~+9 °F vs the oilT baseline (postT ≈ 89.4 °F when oilT ≈ 80.3 °F), and bare-element resistance measured 2.06 kΩ at room temp. The firmware's `POST_SC_TEMP_R25 = 3520.0f` assumes a different GM IAT curve.
+
+Effective resistance the firmware computes from the actual A1 voltage is ~2600 Ω, vs the ~2300 Ω the bare element shows at room temp. The mismatch could be split between:
+- Pull-up tolerance (Matthew's "2.2 kΩ" may actually be 2.3-2.4 kΩ)
+- Wrong R25 / Beta assumption for this specific sensor
+
+**Action (deferred — not required for v4 ship):**
+1. Get a resistance vs temperature curve for the actual sensor in hand (datasheet, OEM part number lookup, or manual point-by-point measurement at ice bath / room temp / hot water).
+2. Fit R25 and Beta to the actual curve.
+3. Update `POST_SC_TEMP_R25` and `POST_SC_TEMP_BETA` in `config.h`.
+4. If the actual pull-up resistance differs from 2.49 kΩ, update `POST_SC_TEMP_PULLUP_OHMS` to match the installed value.
+5. Re-bench at three points (ice / room / boiling) to verify ±2 °F.
+
+Acceptable to skip until the sensor is mounted in the engine bay's airflow, where calibration accuracy actually matters for correlating against intake air temperature for tuning purposes.
+
 ---
 
 ## Self-Review
