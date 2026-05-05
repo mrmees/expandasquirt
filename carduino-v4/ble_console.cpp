@@ -33,6 +33,13 @@ static int n_commands = 0;
 static char rx_buf[BLE_RX_BUFFER_SIZE];
 static size_t rx_len = 0;
 
+// Mirrors sensor_pipeline.cpp health_bitmask construction.
+static constexpr uint8_t HBIT_OIL_TEMP   = 0x01;
+static constexpr uint8_t HBIT_POST_TEMP  = 0x02;
+static constexpr uint8_t HBIT_OIL_PRESS  = 0x04;
+static constexpr uint8_t HBIT_FUEL_PRESS = 0x08;
+static constexpr uint8_t HBIT_PRE_PRESS  = 0x10;
+
 // Forward decl: definition is below BleDumpPhase, but cmd_status calls it.
 static void do_sensor_dump();
 
@@ -128,6 +135,7 @@ static void cmd_boot(const char* args) {
 }
 
 static void cmd_verbose(const char* args) {
+    // Presently inert for periodic dumps; retained for future summary/debug mode.
     if (strcmp(args, "on") == 0) {
         verbose_enabled = true;
         ble_println("verbose on");
@@ -145,7 +153,7 @@ static void cmd_help(const char* args) {
     ble_println("  status            - one-shot sensor dump");
     ble_println("  cal <ch>          - raw ADC + voltage (therm1|2, pres1|2|3)");
     ble_println("  boot              - reset cause, boot count, last fatal error");
-    ble_println("  verbose on|off    - toggle periodic dump");
+    ble_println("  verbose on|off    - reserved for future debug-detail toggle");
     ble_println("  reboot            - soft reset");
     ble_println("  maintenance ...   - enter v4.x OTA mode (see V4X-DESIGN.md)");
     ble_println("  help              - this list");
@@ -276,43 +284,26 @@ void ble_println(const char* msg) {
     tx_char.writeValue((const uint8_t*)eol, 2);
 }
 
-// Internal dump body. Caller is responsible for connection/verbose gating.
-// Single-line packed format optimized for human reading at 1 Hz cadence:
-//   [..XX.] oilT=58.1F postT=63.6F oilP=66.2psi fuelP=66.4psi preP=26.7kPa  flat=Y age=15 seq=141
-// The 5-char [hHhh.] prefix is positional: dot=healthy, X=any-fault, in
-// channel order (oilT, postT, oilP, fuelP, preP). 'flat=Y' suffix appears
-// only when at least one channel is flatlined. 'age' is max held-value age
-// across channels, in 100 ms units (saturates at 25.5 s).
+// Internal dump body. Caller is responsible for connection gating.
 static void do_sensor_dump() {
-    char hbits[6];
-    for (int i = 0; i < 5; i++) {
-        hbits[i] = (gSensorState.health_bitmask & (1 << i)) ? '.' : 'X';
-    }
-    hbits[5] = '\0';
+    char buf[64];
+    format_status_line(buf, sizeof(buf));
+    ble_println(buf);
 
-    uint8_t max_age = 0;
-    for (int i = 0; i < 5; i++) {
-        if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];
-    }
-
-    char buf[128];
-    snprintf(buf, sizeof(buf),
-             "[%s] oilT=%.1fF postT=%.1fF oilP=%.1fpsi fuelP=%.1fpsi preP=%.1fkPa%s age=%u seq=%u",
-             hbits,
-             gSensorState.oil_temp_F_x10        / 10.0f,
-             gSensorState.post_sc_temp_F_x10    / 10.0f,
-             gSensorState.oil_pressure_psi_x10  / 10.0f,
-             gSensorState.fuel_pressure_psi_x10 / 10.0f,
-             gSensorState.pre_sc_pressure_kpa_x10 / 10.0f,
-             any_channel_flatlined() ? "  flat=Y" : "",
-             (unsigned)max_age,
-             (unsigned)gSensorState.sequence_counter);
+    format_sensor_line(buf, sizeof(buf), "oilT",  gSensorState.oil_temp_F_x10,          "F",   HBIT_OIL_TEMP);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "oilP",  gSensorState.oil_pressure_psi_x10,    "PSI", HBIT_OIL_PRESS);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "fuelP", gSensorState.fuel_pressure_psi_x10,   "PSI", HBIT_FUEL_PRESS);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "preP",  gSensorState.pre_sc_pressure_kpa_x10, "kPa", HBIT_PRE_PRESS);
+    ble_println(buf);
+    format_sensor_line(buf, sizeof(buf), "postT", gSensorState.post_sc_temp_F_x10,      "F",   HBIT_POST_TEMP);
     ble_println(buf);
 }
 
 void BleDumpPhase() {
     if (!ble_ok || !ble_client_connected()) return;
-    if (!verbose_enabled) return;  // periodic dumps gated by verbose toggle
     do_sensor_dump();
 }
 
