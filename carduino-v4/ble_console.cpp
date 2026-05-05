@@ -93,11 +93,25 @@ static void cmd_cal(const char* args) {
     ble_println(buf);
 }
 
+static bool verbose_enabled = true;
+
 static void cmd_reboot(const char* args) {
     (void)args;
     ble_println("rebooting in 1 sec...");
     delay(1000);
     NVIC_SystemReset();
+}
+
+static void cmd_verbose(const char* args) {
+    if (strcmp(args, "on") == 0) {
+        verbose_enabled = true;
+        ble_println("verbose on");
+    } else if (strcmp(args, "off") == 0) {
+        verbose_enabled = false;
+        ble_println("verbose off");
+    } else {
+        ble_println("usage: verbose <on|off>");
+    }
 }
 
 static void cmd_help(const char* args) {
@@ -130,10 +144,11 @@ bool ble_init() {
     nus_service.addCharacteristic(rx_char);
     BLE.addService(nus_service);
 
-    ble_register_command("status", cmd_status);
-    ble_register_command("cal", cmd_cal);
-    ble_register_command("reboot", cmd_reboot);
-    ble_register_command("help",   cmd_help);
+    ble_register_command("status",  cmd_status);
+    ble_register_command("cal",     cmd_cal);
+    ble_register_command("reboot",  cmd_reboot);
+    ble_register_command("verbose", cmd_verbose);
+    ble_register_command("help",    cmd_help);
 
     BLE.advertise();
     ble_ok = true;
@@ -196,6 +211,7 @@ void ble_println(const char* msg) {
 
 void BleDumpPhase() {
     if (!ble_ok || !ble_client_connected()) return;
+    if (!verbose_enabled) return;
 
     char buf[64];
     format_status_line(buf, sizeof(buf));
