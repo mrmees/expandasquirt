@@ -72,7 +72,9 @@ static void format_sensor_line(char* out, size_t outlen, const char* label,
 
 static void cmd_status(const char* args) {
     (void)args;
-    BleDumpPhase();
+    // Always emit on demand, regardless of verbose toggle.
+    if (!ble_ok || !ble_client_connected()) return;
+    do_sensor_dump();
 }
 
 static void cmd_cal(const char* args) {
@@ -205,10 +207,8 @@ void ble_println(const char* msg) {
     tx_char.writeValue((const uint8_t*)eol, 2);
 }
 
-void BleDumpPhase() {
-    if (!ble_ok || !ble_client_connected()) return;
-    if (!verbose_enabled) return;
-
+// Internal dump body. Caller is responsible for connection/verbose gating.
+static void do_sensor_dump() {
     char buf[64];
     format_status_line(buf, sizeof(buf));
     ble_println(buf);
@@ -223,6 +223,12 @@ void BleDumpPhase() {
     ble_println(buf);
     format_sensor_line(buf, sizeof(buf), "preP",  gSensorState.pre_sc_pressure_kpa_x10, "kPa", 0x10);
     ble_println(buf);
+}
+
+void BleDumpPhase() {
+    if (!ble_ok || !ble_client_connected()) return;
+    if (!verbose_enabled) return;  // periodic dumps gated by verbose toggle
+    do_sensor_dump();
 }
 
 #endif
