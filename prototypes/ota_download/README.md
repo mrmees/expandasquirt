@@ -47,26 +47,50 @@ Outcome:
   provides internet, R4 pulls firmware from a public URL (e.g. a GitHub
   release asset)
 
-## What's TBD for production
+## What we learned that changed the architecture
 
-- **CA cert source.** The Arduino example bundles `root_ca.h` containing
-  CA certs valid for `downloads.arduino.cc`. For our chosen host
-  (`raw.githubusercontent.com` or `objects.githubusercontent.com`) we
-  need that host's chain. Strategy: extract via
-  `openssl s_client -connect raw.githubusercontent.com:443 -showcerts`
-  and embed the root CA only.
-- **HTTP redirect handling.** GitHub release-asset URLs (`/releases/download/...`)
-  redirect to `objects.githubusercontent.com`. Whether `OTAUpdate::download()`
-  follows redirects is undocumented — needs bench verification in the
-  GitHub-hosted test (which is the next step after this prototype).
-- **`.ota` file generation.** Arduino does not document how a regular
-  sketch `.bin` is wrapped into the `.ota` format the modem expects. The
-  conversion tool likely lives in the
-  [`arduino/uno-r4-wifi-usb-bridge`](https://github.com/arduino/uno-r4-wifi-usb-bridge)
-  repo. Needs investigation in Phase J planning.
-- **WiFi credentials storage.** Phase J needs to decide: hardcoded in
-  `secrets.h` (simple, requires re-flash to change SSID), persisted in
-  EEPROM via BLE command (flexible, more complexity). Lean toward EEPROM
-  since the user can change phone hotspots.
-- **URL provisioning.** Likely as a BLE command parameter:
-  `ota https://github.com/.../firmware.ota`.
+After verifying the arduino.cc round-trip we tried to repeat the test using
+a `.ota` file we re-hosted on a GitHub release. That second test failed in
+two distinct ways before we abandoned the approach:
+
+1. **No HTTP redirect support.** `Arduino_ESP32_OTA::startDownload()` does a
+   single GET to the original URL and rejects anything that isn't HTTP 200
+   (cited line: `Arduino_ESP32_OTA.cpp#L96-L133`). GitHub release-asset URLs
+   serve HTTP 302 redirects to `objects.githubusercontent.com`, so they
+   never work — only direct (no-redirect) URLs like `raw.githubusercontent.com/...`
+   are usable.
+2. **Hardcoded 60s host-side timeout.** `EXTENDED_MODEM_TIMEOUT = 60000` ms
+   in `WiFiS3/Modem.h` is the deadline for `download()` (and even the
+   "non-blocking" `startDownload()` — it also waits for an OK from the
+   bridge before returning). On a phone hotspot at ~1 KB/s with RSA-4096
+   ISRG Root X1 cert validation, the TLS handshake + transfer can easily
+   exceed 60 s. Symptom: `download()` returns `-26` (`Error::Modem`) even
+   though the bridge eventually succeeds in the background. The host has
+   already given up by then.
+3. **`.ota` container is not produced by `arduino-cli`.** The format is
+   LZSS-compressed payload + 20-byte Arduino OTA header (length, CRC32,
+   magic `0x23411002`, HeaderVersion). Generating one from a sketch `.bin`
+   requires running `lzss.py` and then `bin2ota.py UNOR4WIFI` from
+   `arduino-libraries/ArduinoIoTCloud/extras/tools` — a separate manual
+   step per release. Native Windows isn't documented (the helper ships
+   `lzss.so`/`lzss.dylib` only). See `notes-ota-format.md` for the full
+   recipe.
+
+Combined, these issues made the "device pulls from URL" pattern more
+friction than it's worth.
+
+## Decision (2026-05-04): defer wireless OTA
+
+v4 ships with USB-cable firmware updates. The path forward — when we pick
+this up again — is the third-party
+[`JAndrassy/ArduinoOTA`](https://github.com/JAndrassy/ArduinoOTA) library
+which uses a "PC pushes to device" model (TCP listener on port 65280,
+Arduino's `arduinoOTA` binary as the upload tool, raw `.bin`, no certs, no
+60s timeout). That requires a companion app or `arduino-cli`-on-phone
+(Termux) — see `DESIGN.md` §6.4.3 for the v4.x roadmap.
+
+The contents of this directory (`ota_download.ino`, `root_ca.h`,
+`arduino_secrets.h`) are kept as reference for what *did* work
+(arduino.cc round-trip via `OTAUpdate::download()`) and what *didn't*
+(GitHub URL with the same code). Do not use the sketch as-is for production
+— it's research evidence, not a starting point.

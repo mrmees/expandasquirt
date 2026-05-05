@@ -18,7 +18,11 @@ char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as k
 int status = WL_IDLE_STATUS;
 
 OTAUpdate ota;
-static char const OTA_FILE_LOCATION[] = "https://downloads.arduino.cc/ota/UNOR4WIFI_Animation.ota";
+// Direct raw URL — no redirect, single Let's Encrypt cert chain.
+// (Earlier release-asset URL failed with -26 because release downloads
+// 302-redirect to objects.githubusercontent.com which has a different cert
+// chain than github.com itself, and the modem may not follow redirects.)
+static char const OTA_FILE_LOCATION[] = "https://raw.githubusercontent.com/mrmees/ms3pnp-canbus-expander/main/firmware-releases/animation-test.ota";
 
 /* -------------------------------------------------------------------------- */
 void setup() {
@@ -66,10 +70,44 @@ void setup() {
     Serial.println((int)ret);
     return;
   }
-  int ota_size = ota.download(OTA_FILE_LOCATION, "/update.bin");
-  if(ota_size <= 0) {
-    Serial.println("ota.download() error: ");
-    Serial.println(ota_size);
+  // NON-BLOCKING download. Host timeout for the blocking variant is 60s
+  // (EXTENDED_MODEM_TIMEOUT); slow cell hotspot + RSA-4096 ISRG handshake
+  // can easily exceed that. startDownload() kicks off and returns; we poll.
+  Serial.print("ota.startDownload() from: ");
+  Serial.println(OTA_FILE_LOCATION);
+  int rc_start = ota.startDownload(OTA_FILE_LOCATION, "/update.bin");
+  Serial.print("startDownload() returned: ");
+  Serial.println(rc_start);
+  if(rc_start < 0) {
+    Serial.println("startDownload FAILED");
+    return;
+  }
+  // Poll progress every 5s until done or stuck. Bridge spec says
+  // downloadProgress() returns bytes-downloaded-so-far, with the value
+  // settling once download completes. We give it 6 minutes max.
+  int last_p = -1;
+  unsigned long t_start = millis();
+  while (millis() - t_start < 360000UL) {
+    delay(5000);
+    int p = ota.downloadProgress();
+    Serial.print("  progress: ");
+    Serial.print(p);
+    Serial.print(" (elapsed ");
+    Serial.print((millis()-t_start)/1000);
+    Serial.println("s)");
+    if (p < 0) { Serial.println("downloadProgress error"); return; }
+    if (p == last_p && p > 0) {
+      // Progress stopped advancing; assume done.
+      Serial.println("progress stable -> assume complete");
+      break;
+    }
+    last_p = p;
+  }
+  int ota_size = ota.downloadProgress();
+  Serial.print("final size: ");
+  Serial.println(ota_size);
+  if (ota_size <= 0) {
+    Serial.println("download FAILED — final size <= 0");
     return;
   }
   ret = ota.verify();

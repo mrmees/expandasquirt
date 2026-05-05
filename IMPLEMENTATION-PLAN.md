@@ -3608,9 +3608,20 @@ git commit -m "decision: OTA path forward documented"
 
 ---
 
-## Phase J: Maintenance Mode Integration (Tasks 41-44)
+## Phase J: Maintenance Mode Integration (Tasks 41-44) — DEFERRED to v4.x
 
-⚠️ **Skip Phase J entirely if Task 40 decided to fall back to USB-only OTA.**
+🛑 **Task 40 (2026-05-04) decided: defer Phase J.** v4 ships with USB-only
+firmware updates. The wireless OTA path will be revisited together with the
+companion Android app — see `DESIGN.md` §6.4.3 for the v4.x roadmap.
+
+Tasks 41-44 below are kept for reference but should NOT be executed as part
+of v4. When v4.x picks them up, the AP+upload pattern below will be replaced
+with the JAndrassy/ArduinoOTA listener pattern, so most of the implementation
+detail will need rewriting at that point.
+
+---
+
+**Original (now-deferred) plan follows:**
 
 ### Task 41: Maintenance mode entry/exit state machine
 

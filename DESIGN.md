@@ -356,7 +356,7 @@ All other CAN traffic on the bus is filtered out at the MCP2515 hardware level. 
 
 ---
 
-## 6. BLE Console + On-Demand WiFi AP for OTA
+## 6. BLE Console (Wireless OTA deferred to v4.x)
 
 ### 6.1 Default state: BLE Serial console, WiFi off
 
@@ -394,82 +394,73 @@ The Carduino advertises a BLE peripheral with a **Nordic UART Service (NUS)**-st
 | `maintenance` / `abort` | Enter / cancel maintenance mode |
 | `help` | Print command list |
 
-### 6.4 Maintenance mode (firmware update flow)
+### 6.4 Firmware update strategy
 
-```
-[Normal mode] — BLE up, WiFi off, sensors flowing
+**v4 ships with USB-cable updates only.** Wireless OTA is deferred to a future
+release that will ship together with a companion Android app (see §6.4.3).
 
-  ↓ user sends "maintenance" via BLE
+#### 6.4.1 Today's workflow (USB)
 
-[Acknowledging — 3 sec window]
-  BLE responds: "Entering maintenance mode in 3 sec... cancel with 'abort'"
-  CAN status flag bit 2 (OTA in progress) set
+1. Open the enclosure (or just keep it open during dev iteration).
+2. `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> carduino-v4/`
+3. Sketch resets and reboots into the new firmware.
 
-[Suspending]
-  Sensor + CAN tasks halt
-  BLE peripheral shuts down (avoids ESP32-S3 dual-stack risk)
-  LED matrix transitions to maintenance display
+This is the same workflow used throughout v4 development. No external services,
+no cert management, no app dependency. Trade-off: physical access to the USB
+port is required, which conflicts with the planned weatherproof in-car install
+once the device leaves the bench.
 
-[AP active]
-  WiFi switches to AP mode:
-    SSID:     "CARDUINO-OTA"
-    Password: fixed in secrets.h
-    IP:       192.168.4.1
-  HTTP server starts on port 80:
-    GET  /         → upload form (HTML in PROGMEM, ~2 KB)
-    POST /upload   → multipart-form-data, streams to update partition
-    GET  /status   → JSON: {state, bytes_received, last_error}
+#### 6.4.2 Why wireless OTA is deferred
 
-[Upload]
-  User connects phone/laptop to "CARDUINO-OTA" AP
-  Browser → http://192.168.4.1
-  Choose .bin, click Upload
-  Server streams incoming bytes directly to update partition (no RAM buffering)
-  Progress bar updates via JS polling /status
-  Onboard LED matrix shows live progress bar (independent confirmation)
+We prototyped two wireless OTA paths during 2026-05-04 (research artifacts in
+`prototypes/ota_proto/` and `prototypes/ota_download/`):
 
-[Apply + reboot]
-  Server replies "rebooting"
-  Triggers OTA apply
-  Bootloader applies update from update partition
-  Reboot
+- **Path α — R4 in AP mode + HTTP upload from phone, host writes bytes
+  directly to modem filesystem with `WIFI_FILE_APPEND`.** Blocked by a modem
+  firmware 0.6.0 bug: the second `WIFI_FILE_APPEND` call wedges the modem
+  entirely until USB power-cycle. Verified on bench.
 
-[Back to normal mode]
-```
+- **Path β — R4 in STA mode pulls firmware from a hosted URL via
+  `OTAUpdate::download(URL, path)`.** Verified working end-to-end against
+  Arduino's CDN at `downloads.arduino.cc` (R4 booted into the test animation
+  firmware after the round-trip). However:
+  - Host-side `EXTENDED_MODEM_TIMEOUT = 60 s` is hardcoded in `WiFiS3` and
+    too short for slow phone-hotspot uploads with RSA-4096 (Let's Encrypt
+    ISRG Root X1) cert validation.
+  - Producing the `.ota` container requires running `lzss.py` then
+    `bin2ota.py` from `arduino-libraries/ArduinoIoTCloud/extras/tools` —
+    not part of `arduino-cli compile`. Adds friction to every release.
+  - Each release would need to be hosted on a public URL (GitHub Releases
+    or similar) and CA chains must match host (Sectigo for `github.com`
+    leafs, Let's Encrypt for `raw.githubusercontent.com`, etc.).
 
-**Abort path:** typing `abort` during the 3-sec window cancels and stays in normal mode.
+The cleanest wireless path identified is the third-party
+[`JAndrassy/ArduinoOTA`](https://github.com/JAndrassy/ArduinoOTA) library
+which supports R4 WiFi with WiFiS3. It uses a "PC pushes to device" model
+over a TCP listener on port 65280. No `.ota` container, no CA management, no
+host-side timeout — but it requires a companion tool on the user's phone or
+laptop (e.g. `arduino-cli` running under Termux on Android) to push the bin.
+That companion tool is the missing piece.
 
-### ⚠️ Open Risk: This entire OTA flow is design-intent, not design-locked
+#### 6.4.3 v4.x roadmap: companion Android app
 
-The actual `OTAUpdate` library API in `ArduinoCore-renesas` exposes a **file-based** flow, not a stream-based flow:
+Future scope, not part of v4:
 
-```
-OTAUpdate::begin(file_path)
-OTAUpdate::download(url, file_path)   // pulls from URL to onboard storage
-OTAUpdate::verify()
-OTAUpdate::update(file_path)          // applies from onboard storage
-```
+- Android companion app that handles BOTH the live BLE sensor console (the
+  primary day-to-day UX, replacing terminal apps like `nRF Connect`) AND
+  acts as the firmware push tool over WiFi when the user enters maintenance
+  mode.
+- Firmware-side: in-firmware maintenance state machine that ends BLE,
+  switches modem to WiFi STA, connects to the user's phone hotspot, brings
+  up the JAndrassy listener, and waits for a push.
+- Apply step is handled inside JAndrassy's `InternalStorageRenesas`
+  abstraction — no external bootloader interaction required.
+- Eliminates the need for any externally-hosted firmware artifact. Updates
+  flow phone → R4 over WiFi, with the BLE side providing the trigger and
+  status display.
 
-The "stream upload directly to update partition" language in the flow above is **aspirational** — it doesn't match the library's exposed API. We don't yet know whether:
-- The R4 has writable mass storage (QSPI flash partition?) we can stream uploads to
-- The library can be coaxed into accepting a locally-staged file via `update(file_path)` after we receive it via HTTP
-- We need to call the underlying DFU primitives directly
-- Any of this is realistic on this MCU at all
-
-**Three speculative paths, all unproven:**
-
-| Path | Approach | Status |
-|------|----------|--------|
-| α | Stream HTTP upload to onboard flash file, then call `OTAUpdate::update(file_path)` | Plausible, requires QSPI-backed file API |
-| β | Have HTTP server save file, then call `OTAUpdate::download("http://127.0.0.1/firmware.bin", path)` | Indirect; might not work with localhost loopback on AP interface |
-| γ | Call RA4M1 DFU primitives directly with streamed bytes | Requires reading library internals; out-of-band of the official API |
-
-**Implementation plan:**
-1. **Build the system without OTA first.** Fall back to USB-cable upload via Arduino IDE / `arduino-cli`.
-2. **Prototype the upload-and-apply flow in a standalone sketch** before integrating into the production firmware. This is bench-verify item #5 in §9.
-3. **If no path works cleanly**, accept that v4 ships with USB-cable OTA only and revisit wireless OTA in v5.
-
-The maintenance-mode flow described in §6.4 is **the goal**, not a guarantee. Treat the BLE-triggered AP-mode upload pattern as "what we want to build if the library supports it."
+Until that app exists, USB updates are sufficient for the development phase
+and any rare in-car update needed in v4.
 
 ### 6.5 LED matrix (12×8) status display
 
