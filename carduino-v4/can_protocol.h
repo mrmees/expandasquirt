@@ -34,6 +34,12 @@ void pack_frame1(const SensorState* s, uint8_t* out8);
 // status_flags and max_age supplied externally (computed in higher-level code).
 void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, uint8_t* out8);
 
+// Send one final Frame 2 with bit 2 of status_flags set (OTA in progress)
+// before halting CAN broadcasts on entry to v4.x maintenance mode.
+// Gives downstream loggers (TunerStudio) a clean "going down" marker
+// instead of an unexplained data freeze. Per V4X-DESIGN.md §5.4.
+void can_send_maintenance_marker();
+
 #ifdef __cplusplus
 }
 #endif

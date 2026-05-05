@@ -116,8 +116,8 @@ void CanSendPhase() {
     // Frame 2
     uint8_t status_flags = 0;
     if (gSensorState.ready_flag)      status_flags |= 0x01;  // bit 0: ready
-    // bit 1: WiFi AP active (Phase J)
-    // bit 2: OTA in progress (Phase J)
+    // bit 1: WiFi AP active (reserved — unused in v4.x; the LOH model has the AP on the phone, not the device)
+    // bit 2: OTA in progress (set by can_send_maintenance_marker() at MM_ARMED entry; never set during normal CanSendPhase)
     if (ble_client_connected())       status_flags |= 0x08;  // bit 3: BLE client connected
     if (gSystemHealth.can_errors_warning) status_flags |= 0x10;  // bit 4: CAN errors warning
     if (any_channel_flatlined())      status_flags |= 0x20;  // bit 5: any channel flatlined
@@ -134,6 +134,34 @@ void CanSendPhase() {
     memcpy(f2.data, buf, 8);
     // TODO(task-after-18): track sendMessage return values.
     mcp2515.sendMessage(&f2);
+}
+
+void can_send_maintenance_marker() {
+    // Build a Frame 2 reflecting current state, then OR in bit 2 (OTA in progress)
+    // so the MS3-side log shows a clean "going down" marker. This is the last
+    // CAN traffic from us before the maintenance state machine halts broadcasts.
+    uint8_t status_flags = 0;
+    if (gSensorState.ready_flag)      status_flags |= 0x01;
+    status_flags |= 0x04;  // bit 2: OTA in progress
+    if (ble_client_connected())       status_flags |= 0x08;
+    if (gSystemHealth.can_errors_warning) status_flags |= 0x10;
+    if (any_channel_flatlined())      status_flags |= 0x20;
+    if (gSystemHealth.loop_timing_warn)   status_flags |= 0x40;
+    if (gSystemHealth.can_busoff_active)  status_flags |= 0x80;
+
+    uint8_t max_age = 0;
+    for (int i = 0; i < 5; i++) {
+        if (gSensorState.age_ticks[i] > max_age) max_age = gSensorState.age_ticks[i];
+    }
+
+    uint8_t buf[8];
+    pack_frame2(&gSensorState, status_flags, max_age, buf);
+
+    struct can_frame f;
+    f.can_id  = CAN_TX_FRAME2_ID;
+    f.can_dlc = 8;
+    memcpy(f.data, buf, 8);
+    mcp2515.sendMessage(&f);
 }
 
 void CanReceivePhase() {
