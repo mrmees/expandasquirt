@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "works.mees.carduino"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "works.mees.carduino"
-        minSdk = 26          // Android 8.0 — needed for WifiManager.startLocalOnlyHotspot()
-        targetSdk = 35       // Android 15
+        minSdk = 26          // Android 8.0 — WifiManager.startLocalOnlyHotspot() base API
+        targetSdk = 36       // Android 16 — startLocalOnlyHotspotWithConfiguration (forced WPA2 for OTA)
         versionCode = 1
         versionName = "0.1.0"
     }
