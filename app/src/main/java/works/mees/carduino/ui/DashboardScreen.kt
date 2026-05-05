@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ fun DashboardScreen(
     vm: DashboardViewModel,
     onMenuFirmwareUpdate: () -> Unit,
     onMenuDiagnostics: () -> Unit,
+    onForget: () -> Unit,
 ) {
     val state by vm.state.collectAsState()
     var menuOpen by remember { mutableStateOf(false) }
@@ -71,6 +73,14 @@ fun DashboardScreen(
                             onClick = {
                                 menuOpen = false
                                 onMenuDiagnostics()
+                            },
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Forget device") },
+                            onClick = {
+                                menuOpen = false
+                                onForget()
                             },
                         )
                     }
