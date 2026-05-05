@@ -2933,20 +2933,26 @@ Check the RA4M1 reset status registers. From `r_system.h` (FSP):
 #include <Arduino.h>
 
 ResetCause read_reset_cause() {
-    // RSTSR0 / RSTSR1 / RSTSR2 are at fixed addresses on RA4M1
-    // Using direct register access (verify addresses against datasheet)
+    // RSTSR0 / RSTSR1 are at fixed addresses on RA4M1.
+    // Corrected during implementation from R7FA4M1AB.h / .svd in the
+    // Arduino Renesas core. The original plan masks for brownout,
+    // watchdog, and soft reset were wrong.
+    // Do not clear these bits after reading; later boot logic may still
+    // need to observe them.
     volatile uint8_t* RSTSR0 = (volatile uint8_t*)0x4001E410;
     volatile uint8_t* RSTSR1 = (volatile uint8_t*)0x4001E0C0;
 
     if (*RSTSR0 & 0x01) return RESET_POWER_ON;        // PORF
-    if (*RSTSR1 & 0x80) return RESET_BROWNOUT;        // LVD0RF
-    if (*RSTSR1 & 0x04) return RESET_WATCHDOG;        // IWDTRF
-    if (*RSTSR1 & 0x40) return RESET_SOFT;            // SWRF
+    if (*RSTSR0 & 0x02) return RESET_BROWNOUT;        // LVD0RF
+    if (*RSTSR1 & 0x01) return RESET_WATCHDOG;        // IWDTRF
+    if (*RSTSR1 & 0x04) return RESET_SOFT;            // SWRF
     return RESET_UNKNOWN;
 }
 ```
 
 ⚠️ **Verify register addresses** against the RA4M1 datasheet (https://www.renesas.com/en/document/dst/ra4m1-group-datasheet). If wrong, fall back to `RESET_UNKNOWN`.
+
+Implementation note: the original plan content's masks for brownout, watchdog, and soft reset were wrong; corrected values above were verified against the RA4M1 `R7FA4M1AB.h` / `.svd` definitions in the Arduino Renesas core. The priority order is power-on > brownout > watchdog > soft when multiple bits are set.
 
 - [ ] **Step 2: Wire reset cause into `setup()`**
 
