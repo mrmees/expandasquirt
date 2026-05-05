@@ -26,6 +26,9 @@ static int n_commands = 0;
 static char rx_buf[BLE_RX_BUFFER_SIZE];
 static size_t rx_len = 0;
 
+// Forward decl: definition is below BleDumpPhase, but cmd_status calls it.
+static void do_sensor_dump();
+
 void ble_register_command(const char* name, CommandHandler h) {
     if (n_commands < MAX_COMMANDS) {
         commands[n_commands++] = { name, h };
