@@ -253,6 +253,14 @@ bool ble_client_connected() {
     return BLE.central().connected();
 }
 
+void ble_end() {
+    if (!ble_ok) return;
+    BLE.disconnect();
+    BLE.stopAdvertise();
+    BLE.end();
+    ble_ok = false;
+}
+
 void ble_println(const char* msg) {
     if (!ble_ok || !ble_client_connected()) return;
 

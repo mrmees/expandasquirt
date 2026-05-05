@@ -5,6 +5,7 @@
 #include "self_tests.h"
 #include "ble_console.h"
 #include "persistent.h"
+#include "maintenance_mode.h"
 
 unsigned long lastSensorMs = 0;
 unsigned long lastCanMs    = 0;
@@ -75,7 +76,12 @@ void loop() {
     check_watchdog();
     unsigned long now = millis();
 
-    if (now - lastSensorMs >= SENSOR_PERIOD_MS) {
+    // Sensor reads, CAN broadcasts, and periodic BLE dumps are gated on
+    // !maintenance_is_active() — during v4.x maintenance/OTA mode we want
+    // those phases halted. CanReceivePhase, BleServicePhase, DisplayUpdate
+    // and the maintenance state machine itself stay running.
+
+    if (!maintenance_is_active() && now - lastSensorMs >= SENSOR_PERIOD_MS) {
         SensorPhase();
         // Temporary: print sensor readings to USB serial every 500 ms
         static unsigned long lastPrintMs = 0;
@@ -90,7 +96,7 @@ void loop() {
         lastSensorMs = now;
     }
 
-    if (now - lastCanMs >= CAN_PERIOD_MS) {
+    if (!maintenance_is_active() && now - lastCanMs >= CAN_PERIOD_MS) {
         if (self_test_can_available()) {
             CanSendPhase();
         }
@@ -101,7 +107,7 @@ void loop() {
 
     BleServicePhase();
 
-    if (now - lastBleDumpMs >= BLE_PERIOD_MS) {
+    if (!maintenance_is_active() && now - lastBleDumpMs >= BLE_PERIOD_MS) {
         BleDumpPhase();
         lastBleDumpMs = now;
     }
@@ -110,6 +116,10 @@ void loop() {
         DisplayUpdate();
         lastDisplayMs = now;
     }
+
+    // State machine ticks every loop — handles state transitions and runs
+    // ArduinoOTA.poll() during MM_OTA_READY / MM_UPLOAD_APPLYING.
+    maintenance_tick(now);
 
     unsigned long loop_dur = millis() - loop_start;
     if (loop_dur > 50) {
