@@ -4123,7 +4123,9 @@ git commit -m "docs: bench test procedures"
 ```markdown
 # CARDUINO v4
 
-Sensor adapter for MS3Pro PNP on a 2000 NB1 Miata. Reads 5 aftermarket sensors (oil temp/pressure, fuel pressure, pre/post-supercharger pressure and temp), broadcasts to MS3 via CAN at 10 Hz. BLE debug console + on-demand WiFi AP for OTA.
+CARDUINO v4 is a sensor adapter for an MS3Pro PNP on a 2000 NB1 Miata. It reads
+five aftermarket analog sensors on an Uno R4 WiFi-class board, converts them to
+engineering units, and broadcasts them to MS3 over CAN at 10 Hz.
 
 See `DESIGN.md` for the full spec, `IMPLEMENTATION-PLAN.md` for the build plan.
 
@@ -4143,12 +4145,7 @@ arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
 arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> carduino-v4/
 ```
 
-## Flash (OTA, in maintenance mode)
-1. BLE-connect via phone (`Serial Bluetooth Terminal` etc.)
-2. Type `maintenance`
-3. Connect phone WiFi to `CARDUINO-OTA` AP
-4. Browser to `http://192.168.4.1`
-5. Upload `.bin`
+Wireless firmware updates are deferred to v4.x; see `DESIGN.md` section 6.4.3.
 
 ## Tests (host-side pure logic)
 ```bash
