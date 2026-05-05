@@ -6,8 +6,13 @@ extern "C" {
 // Mirror declarations from sensor_pipeline.h that we want to test
 float thermistor_to_F(int adc_raw, float pullup_ohms, float r25, float beta);
 float pressure_psi(int adc_raw, float psi_at_full_scale);
+float pressure_psi_from_kpa_abs(int adc_raw, float kpa_at_full_scale);
 float bosch_kpa(int adc_raw);
 float ewma_step(float current, float new_sample, float alpha);
+}
+
+static int adc_for_oil_kpa_abs(float kpa_abs) {
+    return (int)((kpa_abs / OIL_PRESS_KPA_AT_FS) * ADC_MAX_COUNT + 0.5f);
 }
 
 TEST_CASE(thermistor_at_25C_returns_77F) {
@@ -46,6 +51,30 @@ TEST_CASE(pressure_psi_full_scale) {
 TEST_CASE(pressure_psi_different_full_scales) {
     ASSERT_NEAR(pressure_psi(ADC_MAX_COUNT / 2, 150.0f), 75.0f, 0.5f);
     ASSERT_NEAR(pressure_psi(ADC_MAX_COUNT / 4, 200.0f), 50.0f, 0.5f);
+}
+
+TEST_CASE(pressure_psi_from_kpa_abs_atmospheric_clamps_to_zero_gauge) {
+    int adc = adc_for_oil_kpa_abs(ATM_KPA_NOMINAL);
+    ASSERT_NEAR(pressure_psi_from_kpa_abs(adc, OIL_PRESS_KPA_AT_FS), 0.0f, 0.1f);
+}
+
+TEST_CASE(pressure_psi_from_kpa_abs_half_supply) {
+    int adc = adc_for_oil_kpa_abs(250.0f);
+    ASSERT_NEAR(pressure_psi_from_kpa_abs(adc, OIL_PRESS_KPA_AT_FS),
+                (250.0f - ATM_KPA_NOMINAL) * 0.145038f,
+                0.1f);
+}
+
+TEST_CASE(pressure_psi_from_kpa_abs_below_atmospheric_clamps_to_zero) {
+    int adc = adc_for_oil_kpa_abs(50.0f);
+    ASSERT_NEAR(pressure_psi_from_kpa_abs(adc, OIL_PRESS_KPA_AT_FS), 0.0f, 0.01f);
+}
+
+TEST_CASE(pressure_psi_from_kpa_abs_max_readable_sender_output) {
+    int adc = adc_for_oil_kpa_abs(470.0f);
+    ASSERT_NEAR(pressure_psi_from_kpa_abs(adc, OIL_PRESS_KPA_AT_FS),
+                (470.0f - ATM_KPA_NOMINAL) * 0.145038f,
+                0.1f);
 }
 
 TEST_CASE(bosch_kpa_at_4V_input) {

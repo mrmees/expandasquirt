@@ -18,6 +18,11 @@ float thermistor_to_F(int adc_raw, float pullup_ohms, float r25, float beta);
 // to PSI. Assumes 0V = 0 PSI, V_REF = psi_at_full_scale linear.
 float pressure_psi(int adc_raw, float psi_at_full_scale);
 
+// For ratiometric absolute-pressure sensors with linear V/P transfer.
+// Returns gauge pressure in PSI, clamped to >= 0 (gauge can't be negative
+// for oil pressure use; if the abs reading is below atmospheric, report 0).
+float pressure_psi_from_kpa_abs(int adc_raw, float kpa_at_full_scale);
+
 // Convert raw ADC reading from the Bosch 0 261 230 146 MAP sensor
 // to kPa absolute. Uses BOSCH_SLOPE / BOSCH_OFFSET from config.h.
 float bosch_kpa(int adc_raw);

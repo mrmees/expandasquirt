@@ -4238,6 +4238,26 @@ git commit -m "test: Phase 2 in-car validation complete"
 
 ---
 
+## Deferred fixes (captured during bench validation)
+
+### Task 51: Recalibrate oil pressure conversion for absolute-pressure sender [DONE]
+
+Discovered during Test 1.3 (2026-05-05). The oil pressure sender Matthew has on hand is a **5-bar absolute pressure sensor** (transfer curve `Vout/Vsupply = 0.2 × P_kPa_abs`, floors at ~6%, caps at ~94% / ~470 kPa abs / ~54 PSI gauge), not a standard 0-100 PSI gauge ratiometric sender.
+
+The current `pressure_psi(adc, psi_at_fs)` in `sensor_pipeline.cpp` does naive linear `(adc/max) × psi_at_fs`, which is wrong for this sender. At atmospheric pressure (sender at rest) the firmware reads ~19 PSI instead of 0.
+
+**Action:**
+1. Add a `pressure_psi_from_kpa_abs(adc, kpa_at_fs)` helper analogous to `bosch_kpa()`. Implementation: `kpa_abs = (adc/adc_max) × kpa_at_fs`, then `psi_gauge = (kpa_abs - 100) × 0.145038f`.
+2. Add config constants `OIL_PRESS_KPA_AT_FS` (≈ 500 for the 5-bar sensor) and use the new conversion in `sensor_pipeline.cpp`.
+3. Tune the actual 6% offset / 94% cap into the conversion if precision matters at the bottom of the scale; for normal-running oil pressure (30-50 PSI) the linear approximation should be sufficient.
+4. Re-validate against atmospheric (should read 0 PSI ± noise) and a known higher pressure if available.
+
+User accepts the ~54 PSI clip ceiling — sender is for low-side oil pressure monitoring, not high-pressure boost. Note in DESIGN.md §1.3 that the oil pressure sensor is a 5-bar absolute, not a 100 PSI gauge.
+
+If the fuel pressure sender is the same family, apply the same fix to that channel too. (Pending — Matthew didn't have the fuel pressure sender on the bench during 1.3.)
+
+---
+
 ## Self-Review
 
 After writing the plan, I checked it against the spec:

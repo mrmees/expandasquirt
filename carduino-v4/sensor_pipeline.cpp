@@ -18,6 +18,15 @@ float pressure_psi(int adc_raw, float psi_at_full_scale) {
     return ((float)adc_raw / (float)ADC_MAX_COUNT) * psi_at_full_scale;
 }
 
+float pressure_psi_from_kpa_abs(int adc_raw, float kpa_at_full_scale) {
+    float kpa_abs = ((float)adc_raw / (float)ADC_MAX_COUNT) * kpa_at_full_scale;
+    float kpa_gauge = kpa_abs - ATM_KPA_NOMINAL;
+    if (kpa_gauge < 0.0f) {
+        kpa_gauge = 0.0f;
+    }
+    return kpa_gauge * 0.145038f;
+}
+
 float bosch_kpa(int adc_raw) {
     float v = ((float)adc_raw / (float)ADC_MAX_COUNT) * V_REF;
     return BOSCH_SLOPE * v + BOSCH_OFFSET;
@@ -140,7 +149,8 @@ void SensorPhase() {
     gSensorState.post_sc_temp_F_x10 = clamp_to_u16(thermistor_to_F(
         (int)ewma_post_sc_temp, POST_SC_TEMP_PULLUP_OHMS, POST_SC_TEMP_R25, POST_SC_TEMP_BETA) * 10.0f);
 
-    gSensorState.oil_pressure_psi_x10  = (uint16_t)(pressure_psi((int)ewma_oil_press,  OIL_PRESS_PSI_AT_FS) * 10.0f);
+    gSensorState.oil_pressure_psi_x10  = (uint16_t)(pressure_psi_from_kpa_abs((int)ewma_oil_press, OIL_PRESS_KPA_AT_FS) * 10.0f);
+    // TODO: Bench-confirm whether the fuel sender is the same absolute-pressure family.
     gSensorState.fuel_pressure_psi_x10 = (uint16_t)(pressure_psi((int)ewma_fuel_press, FUEL_PRESS_PSI_AT_FS) * 10.0f);
     gSensorState.pre_sc_pressure_kpa_x10 = (uint16_t)(bosch_kpa((int)ewma_pre_sc_press) * 10.0f);
 

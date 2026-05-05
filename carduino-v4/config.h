@@ -43,7 +43,8 @@
 #define POST_SC_TEMP_BETA         3984.0f
 
 // ===== Pressure sensor full-scale =====
-#define OIL_PRESS_PSI_AT_FS   100.0f
+#define OIL_PRESS_KPA_AT_FS   500.0f
+#define ATM_KPA_NOMINAL       101.325f
 #define FUEL_PRESS_PSI_AT_FS  100.0f
 
 // ===== Bosch 0 261 230 146 transfer function =====

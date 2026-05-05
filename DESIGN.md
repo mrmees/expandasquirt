@@ -37,7 +37,7 @@ These are explicitly v5+ scope.
 |---|--------|------|-------|-----|---------|
 | 1 | Oil temperature | NTC thermistor (10kΩ, B=3950) | 80–300 °F useful | A0 | 10 kΩ to 5V |
 | 2 | Post-supercharger air temperature | GM open-element NTC | 60–300 °F useful | A1 | 2.49 kΩ to 5V |
-| 3 | Oil pressure | 0-5V ratiometric, 0-100 PSI | 0–100 PSI | A2 | none |
+| 3 | Oil pressure | 5-bar absolute pressure transducer | 0–~54 PSI gauge effective | A2 | none |
 | 4 | Fuel pressure | 0-5V ratiometric, 0-100 PSI | 0–100 PSI | A3 | none |
 | 5 | Pre-supercharger pressure (filter restriction) | Bosch 0 261 230 146 (3-pin MAP) | 10–115 kPa absolute | A4 | none |
 | — | A5 unused, reserved for future expansion | | | A5 | — |
@@ -73,7 +73,7 @@ Pin    Function                              Notes
 A0     Oil temperature (NTC thermistor)      10 kΩ NTC + 10 kΩ pull-up to 5V
                                              SAME WIRING AS v3
 A1     Post-SC temperature (GM open-el NTC)  2.49 kΩ pull-up to 5V
-A2     Oil pressure (0-5V ratiometric)       Direct connection — 5V-tolerant
+A2     Oil pressure (5-bar absolute)         Direct connection — 5V-tolerant
 A3     Fuel pressure (0-5V ratiometric)      Direct connection
 A4     Pre-SC pressure (Bosch 0 261 230 146) Direct connection
 A5     Reserved                              Unused in v4
@@ -214,7 +214,27 @@ Per-sensor parameters:
 | Oil temp (A0) | 10 kΩ | 10 kΩ | 3950 |
 | Post-SC temp (A1) | 2.49 kΩ | ~3520 Ω | 3984 (typical GM — verify against actual part) |
 
-**Ratiometric pressure (A2 oil, A3 fuel):**
+**Oil pressure (A2):**
+
+5-bar absolute pressure transducer. Transfer curve bench-identified in Task 51:
+`Vout/Vsupply = 0.2 x P_kPa_abs`. Firmware converts absolute kPa to gauge PSI
+using nominal atmosphere and clamps negative gauge pressure to 0.
+
+```c
+float pressure_psi_from_kpa_abs(int adc_raw, float kpa_at_full_scale) {
+    float kpa_abs = (adc_raw / 16383.0) * kpa_at_full_scale;
+    float kpa_gauge = kpa_abs - 101.325;
+    if (kpa_gauge < 0.0) {
+        kpa_gauge = 0.0;
+    }
+    return kpa_gauge * 0.145038;
+}
+```
+
+Bench sender output floors near 6% and caps near 94%, so the practical readable
+top end is about 470 kPa absolute, or about 54 PSI gauge.
+
+**Ratiometric fuel pressure (A3):**
 
 Assumed default: 0V = 0 PSI, 5V = 100 PSI linear.
 
@@ -224,7 +244,7 @@ float pressure_psi(int adc_raw, float psi_at_full_scale) {
 }
 ```
 
-⚠️ **Bench-verify before flashing:** confirm whether the actual gauge sensors are 0–5V or 0.5–4.5V output. If 0.5–4.5V, conversion needs an offset/scale step.
+⚠️ **Bench-verify before flashing:** confirm whether the actual fuel gauge sensor is 0–5V or 0.5–4.5V output. If 0.5–4.5V, conversion needs an offset/scale step.
 
 **Bosch 0 261 230 146 pre-SC (A4):**
 
