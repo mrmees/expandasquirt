@@ -1,0 +1,8 @@
+// Top-level build file. Plugin versions are declared here for the whole
+// project. Subproject build files (app/build.gradle.kts) apply the IDs.
+plugins {
+    id("com.android.application") version "8.7.0" apply false
+    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" apply false
+}

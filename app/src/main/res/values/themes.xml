@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose handles all theming through MaterialTheme; this is just the
+         splash/window theme used before the activity composables run. -->
+    <style name="Theme.Carduino" parent="android:Theme.Material.NoActionBar.Fullscreen" />
+</resources>

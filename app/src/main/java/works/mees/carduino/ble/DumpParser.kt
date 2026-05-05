@@ -86,9 +86,11 @@ class DumpParser {
             Regex("""\[seq=(\d+)\s+ready=([01])\s+health=0x([0-9A-Fa-f]+)\]""")
 
         // <whitespace>name = value unit health
-        // unit may contain non-ASCII (°), name is alphanumeric
+        // unit may contain non-ASCII (°), name is alphanumeric, health is any
+        // non-whitespace token (firmware emits "ok"/"FAULT"; tests cover "--"
+        // as a defensive case for any future placeholder).
         private val sensorRegex =
-            Regex("""\s*(\w+)\s*=\s*(-?\d+\.?\d*)\s+(\S+)\s+(\w+)\s*""")
+            Regex("""\s*(\w+)\s*=\s*(-?\d+\.?\d*)\s+(\S+)\s+(\S+)\s*""")
     }
 }
 

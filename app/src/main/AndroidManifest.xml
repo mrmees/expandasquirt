@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- BLE central operations (scan + connect) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+                     android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- ACCESS_FINE_LOCATION required for BLE scanning on Android 11 and below.
+         Modern Android (12+) only needs BLUETOOTH_SCAN/CONNECT plus the
+         neverForLocation flag, but we keep this for backward compat with
+         minSdk = 26. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- LocalOnlyHotspot + WiFi state inspection for OTA push -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- HTTP push of firmware .bin to the device's ArduinoOTA listener -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- BLE hardware feature is required (not optional). Lock out devices that
+         don't have BLE — this is a BLE-first app. -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <application
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Carduino"
+        android:allowBackup="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
