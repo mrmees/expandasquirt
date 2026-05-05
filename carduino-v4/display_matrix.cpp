@@ -48,29 +48,39 @@ void display_set_progress(uint8_t pct) {
     progress_pct = pct;
 }
 
+// All status indicators are placed in column 11 (rightmost) so they remain
+// visible when the MCP2515 shield is mounted on top of the R4. We lose most
+// of the matrix's drawing area but gain at-a-glance status from the side.
+
 static void draw_boot() {
     clear_frame();
-    // Simple scanning dot animation
-    int col = (millis() / 100) % 12;
-    set_pixel(col, 4, true);
+    // Vertical scanning dot down col 11
+    int row = (millis() / 100) % 8;
+    set_pixel(11, row, true);
     render_frame();
 }
 
 static void draw_normal() {
     clear_frame();
 
-    // 1 Hz heartbeat in top-right corner (col 11, row 0)
+    // 1 Hz heartbeat: col 11, row 0
     bool hb = ((millis() / 500) % 2) == 0;
     if (hb) set_pixel(11, 0, true);
 
-    // BLE client connected indicator in top-left (col 0, row 0)
-    // Wired in Task 24; for now, leave off.
-
-    // Bottom row: 5 sensor health LEDs (cols 0-4 of row 7)
+    // 5 sensor health LEDs: col 11, rows 2-6 (one per channel, top→bottom)
+    //   row 2: oil_temp        (bit 0x01)
+    //   row 3: post_sc_temp    (bit 0x02)
+    //   row 4: oil_press       (bit 0x04)
+    //   row 5: fuel_press      (bit 0x08)
+    //   row 6: pre_sc_press    (bit 0x10)
     for (int i = 0; i < 5; i++) {
         bool healthy = (gSensorState.health_bitmask >> i) & 1;
-        if (healthy) set_pixel(i, 7, true);
+        if (healthy) set_pixel(11, 2 + i, true);
     }
+
+    // Row 1 and row 7 left blank as visual separators.
+    // BLE client connected indicator (Task 24) will land somewhere visible
+    // in col 11 — TBD when we know what's free.
 
     render_frame();
 }
