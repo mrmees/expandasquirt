@@ -1,0 +1,8 @@
+// Append these inside the `dependencies { ... }` block of your prototype's
+// app/build.gradle.kts (Module: app):
+
+implementation("com.squareup.okhttp3:okhttp:4.12.0")
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+// (BOM, material3, activity-compose, etc. should already be present in the
+// default "Empty Activity (Compose)" template.)

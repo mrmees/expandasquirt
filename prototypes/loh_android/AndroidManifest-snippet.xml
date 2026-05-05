@@ -1,0 +1,16 @@
+<!--
+  Add these <uses-permission> entries to your prototype's
+  app/src/main/AndroidManifest.xml, inside the <manifest> root element
+  (alongside the default Compose template's existing entries).
+
+  The runtime permissions for ACCESS_FINE_LOCATION, NEARBY_WIFI_DEVICES,
+  and CHANGE_WIFI_STATE are requested at activity start in MainActivity.kt.
+  ACCESS_NETWORK_STATE and INTERNET are install-time permissions (no
+  runtime grant needed).
+-->
+
+<uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.INTERNET" />
