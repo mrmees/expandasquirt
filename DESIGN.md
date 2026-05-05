@@ -3,7 +3,7 @@
 **Date:** 2026-05-04
 **Project:** Sensor adapter for MS3Pro PNP (2000 NB1 Miata, MP62 supercharged)
 **Author:** Matthew Mees + Claude (Anthropic) + codex (cross-reviewed)
-**Status:** Architecture and core design locked. OTA path (§6.4) is design-intent only — flagged for prototype validation before commit. Implementation scaffolding (§11) and BLE protocol details (§6.7) added per codex review.
+**Status:** Architecture and core design locked. v4 ships with USB-cable firmware updates only; wireless OTA is deferred to v4.x (§6.4). Implementation scaffolding (§11) and BLE protocol details (§6.7) added per codex review.
 
 ---
 
@@ -160,9 +160,7 @@ loop() iterates as fast as the MCU can — typically <1 ms per pass
     lastDisplayMs = now
   }
 
-  if (maintenanceModeActive) {
-    HttpServerServicePhase()  // only during maintenance
-  }
+  // Wireless OTA maintenance service is deferred to v4.x (§6.4).
 ```
 
 ### 3.2 Why super-loop, not RTOS
@@ -174,13 +172,13 @@ loop() iterates as fast as the MCU can — typically <1 ms per pass
 
 ### 3.3 Critical rule: WiFi must NEVER be called inline during normal operation
 
-The R4's `WiFiS3` library blocks up to 10 seconds during `WiFi.begin()`. WiFi is only enabled during deliberate maintenance mode (§5), where normal operation is suspended.
+The R4's `WiFiS3` library blocks up to 10 seconds during `WiFi.begin()`. v4 does not call WiFi during normal operation; any future maintenance-mode WiFi work is deferred to v4.x (§6.4).
 
 ### 3.4 Watchdog
 
 RA4M1 Independent Watchdog (IWDT):
 - **Normal mode:** 1 sec timeout
-- **Maintenance mode:** 8 sec timeout (flash erase/write needs ≤500 ms typical; 8s gives 16× margin)
+- **Maintenance mode:** deferred with wireless OTA to v4.x (§6.4)
 - On timeout: hardware reset → boot back into normal mode after self-tests
 
 ---
@@ -327,8 +325,8 @@ Byte    Field                                MS3 mapping
 
 **Status flags (byte 6):**
 - bit 0: Ready (EWMA settled)
-- bit 1: WiFi AP active
-- bit 2: OTA in progress
+- bit 1: Reserved for v4.x wireless update state (was WiFi AP active)
+- bit 2: Reserved for v4.x wireless update state (was OTA in progress)
 - bit 3: BLE client connected
 - bit 4: CAN bus errors detected (TXERR > warning threshold or recent recoveries)
 - bit 5: Sensor flatline detected (any sensor)
@@ -362,7 +360,7 @@ All other CAN traffic on the bus is filtered out at the MCP2515 hardware level. 
 
 The Carduino advertises a BLE peripheral with a **Nordic UART Service (NUS)**-style profile — two characteristics, TX (notify) for output, RX (write) for input. Standard phone apps (`Serial Bluetooth Terminal`, `nRF Connect`) speak this directly.
 
-- Always advertising when not in maintenance mode
+- Always advertising during v4 normal operation; maintenance mode is deferred to v4.x (§6.4)
 - Single client at a time
 - Periodic data dump at 5 Hz when client subscribed
 
@@ -391,7 +389,7 @@ The Carduino advertises a BLE peripheral with a **Nordic UART Service (NUS)**-st
 | `clear errors` | Reset fault counters and event log |
 | `selftest` | Re-run boot self-tests (degraded reporting) |
 | `reboot` | Soft reset |
-| `maintenance` / `abort` | Enter / cancel maintenance mode |
+| `maintenance` / `abort` | Reserved for v4.x maintenance mode (§6.4) |
 | `help` | Print command list |
 
 ### 6.4 Firmware update strategy
@@ -472,13 +470,13 @@ and any rare in-car update needed in v4.
 - Bottom row: 5 sensor health LEDs (lit = healthy)
 - Total LEDs lit: ~5-7 out of 96 — visually unobtrusive
 
-**Maintenance entering:** 3-2-1 countdown filling matrix.
+**Maintenance entering:** deferred to v4.x with wireless OTA (§6.4).
 
-**AP active, awaiting upload:** "OTA" + IP scroll once, then "READY".
+**Wireless update ready:** deferred to v4.x with wireless OTA (§6.4).
 
-**Upload in progress:** horizontal progress bar across all 12 columns. Real-time confirmation that bytes are landing.
+**Upload in progress:** deferred to v4.x with wireless OTA (§6.4).
 
-**Applying:** spinner animation, ~1 second.
+**Applying:** deferred to v4.x with wireless OTA (§6.4).
 
 **Error states:** "ERR" + 2-digit code, persistent until reboot.
 
@@ -491,7 +489,7 @@ and any rare in-car update needed in v4.
 | Hybrid: BLE always + WiFi STA always | Dual stack risk on ESP32-S3 bridge layer (codex flagged) |
 | OTA pull from local server | Requires hosting firmware somewhere; doesn't work outside home network |
 
-The chosen pattern (BLE always + WiFi AP on demand) avoids continuous dual-stack operation, gives the everywhere-console of BLE, and provides self-contained OTA from any device with a browser.
+Wireless OTA is deferred to v4.x; the current roadmap is in §6.4.
 
 ### 6.7 BLE protocol specifics
 
@@ -596,7 +594,7 @@ Read on boot, displayed via BLE on connect. ~2 flash writes per boot — negligi
 ### 7.6 Reporting channels
 
 1. **CAN frame** — health bitmask + status flags (machine-readable, fastest)
-2. **LED matrix** — glanceable, no client needed (per-sensor health, ERR##, maintenance progress)
+2. **LED matrix** — glanceable, no client needed (per-sensor health, ERR##; maintenance progress deferred to v4.x per §6.4)
 3. **BLE telnet console** — detailed event log (RAM ring buffer, ~64 events)
 
 ### 7.7 Boot error codes
@@ -606,7 +604,7 @@ Read on boot, displayed via BLE on connect. ~2 flash writes per boot — negligi
 | ERR01 | ADC self-test failed | Halt; manual reboot needed |
 | ERR02 | MCP2515 SPI or loopback failed | Degraded mode (BLE up, retry CAN init) |
 | ERR03 | BLE init failed | Degraded mode (no console, sensors + CAN run) |
-| ERR99 | OTA apply failed (firmware unchanged) | Persistent display until acknowledged |
+| ERR99 | Reserved for v4.x wireless update failure (§6.4) | Persistent display until acknowledged |
 
 ---
 
@@ -620,7 +618,7 @@ Read on boot, displayed via BLE on connect. ~2 flash writes per boot — negligi
 - **1.4 Thermistor curve verification** — ice bath / room temp / boiling water 3-point check, ±2°F tolerance
 - **1.5 CAN frame inspection** — USB-CAN dongle captures frames, every byte matches spec
 - **1.6 Watchdog** — inject artificial delay, verify reset + reset cause logged
-- **1.7 Maintenance mode + OTA** — full flow end-to-end, including failed OTA recovery
+- **1.7 Maintenance mode + OTA** — DEFERRED to v4.x (§6.4); not run for v4
 - **1.8 Persistent state** — verify reset cause / boot counter survive resets
 
 ### 8.2 Phase 2: In-car (post-install)
@@ -631,7 +629,7 @@ Read on boot, displayed via BLE on connect. ~2 flash writes per boot — negligi
 - **2.4 TunerStudio integration** — all 5 channels live and matching BLE console
 - **2.5 Drive cycle datalog** — cold-start, cruise, boost event, idle/decel — clean data, no resets, no false faults
 - **2.6 CAN bus coexistence** — wideband still readable, no collisions
-- **2.7 OTA from driveway** — full maintenance flow works in the car
+- **2.7 OTA from driveway** — DEFERRED to v4.x (§6.4); not run for v4
 
 ### 8.3 Phase 3: Ongoing
 
@@ -662,8 +660,8 @@ The following items are placeholders in the design that need bench verification 
 4. **Post-SC IAT (GM open-element) curve** — verify R₂₅ and β against the actual part purchased.
 
 ### Firmware prototyping required
-5. **R4 `OTAUpdate` library viability** — prototype the AP-mode-receive-then-apply flow as described in §6.4. If none of paths α/β/γ work, accept USB-cable OTA only for v4.
-6. **`OTAUpdate::update(file_path)` working with a locally-staged file** — specifically test whether we can stream upload to a file in onboard storage and then call the apply method, rather than only `download(url, file_path)` from a remote URL.
+5. **R4 wireless OTA viability** — DEFERRED to v4.x; current v4 answer is USB-cable updates only (§6.4).
+6. **`OTAUpdate::update(file_path)` working with a locally-staged file** — DEFERRED to v4.x with wireless OTA (§6.4).
 7. **BLE command fragmentation/MTU behavior** — test with `Serial Bluetooth Terminal` (Android) and `nRF Connect` (iOS/Android) to confirm the 19-byte chunk + reassembly behavior is transparent to the user.
 8. **ConnectivityFirmware version on R4's ESP32-S3** — confirm running v0.6.0+ for stable BLE.
 
@@ -673,8 +671,8 @@ The following items are placeholders in the design that need bench verification 
 11. **Sensor ground-offset noise with engine running** — verify there's no measurable ground-loop voltage between the Carduino's GND and the sensor case grounds when the engine is running and the alternator is loaded. Pressure sensors sharing the 5V rail are most exposed if there's a ground offset between the Carduino's reference and the engine block.
 
 ### Recovery behaviors
-12. **Interrupted OTA upload** — pull the AP connection mid-upload; verify the partial upload doesn't corrupt the running firmware and that the unit recovers cleanly to normal mode.
-13. **Corrupted image apply** — feed the OTA flow a deliberately corrupted .bin; verify the bootloader's CRC/signature check catches it and reverts cleanly.
+12. **Interrupted OTA upload** — DEFERRED to v4.x with wireless OTA (§6.4).
+13. **Corrupted image apply** — DEFERRED to v4.x with wireless OTA (§6.4).
 
 ---
 
@@ -708,8 +706,8 @@ The following items are placeholders in the design that need bench verification 
 |---------|---------|--------|
 | `ArduinoBLE` | latest stable on R4 (≥1.3.x) | Arduino IDE Library Manager |
 | `Arduino_LED_Matrix` | shipped with Renesas core | core-bundled |
-| `OTAUpdate` | shipped with Renesas core | core-bundled |
-| `WiFiS3` | shipped with Renesas core | core-bundled |
+| `OTAUpdate` | deferred to v4.x wireless update work (§6.4) | core-bundled |
+| `WiFiS3` | deferred to v4.x wireless update work (§6.4) | core-bundled |
 | `mcp2515` (autowp/arduino-mcp2515) | 0.5.x (latest as of writing) | https://github.com/autowp/arduino-mcp2515 |
 
 **Pin everything in `library.properties` or a `libraries.txt` manifest** at the project root. Track exact versions in git so a fresh checkout reproduces the same build.
@@ -721,7 +719,7 @@ projects/carduino-v4/
 ├── DESIGN.md                       # This file
 ├── README.md                       # Build / flash / wiring quickstart
 ├── secrets.h.template              # Template for secrets.h
-├── secrets.h                       # gitignored — AP password, etc.
+├── secrets.h                       # gitignored — v4.x wireless update secrets, if needed
 ├── libraries.txt                   # Pinned library versions
 ├── carduino-v4/                    # Arduino sketch root
 │   ├── carduino-v4.ino             # setup() / loop() — minimal, dispatches to phases
@@ -732,7 +730,7 @@ projects/carduino-v4/
 │   ├── system_health.h/.cpp        # MCP2515 errors, loop timing, persistent state
 │   ├── ble_console.h/.cpp          # NUS peripheral, command parser, periodic dump
 │   ├── display_matrix.h/.cpp       # LED matrix state machine (boot, normal, maint, error)
-│   ├── maintenance_mode.h/.cpp     # AP setup, HTTP server, OTA orchestration
+│   ├── maintenance_mode.h/.cpp     # deferred to v4.x wireless update work (§6.4)
 │   └── self_tests.h/.cpp           # Boot self-tests, ERR## codes
 ├── prototypes/                     # Standalone sketches for risk validation
 │   ├── ota_proto/                  # OTAUpdate library API exploration
@@ -760,10 +758,10 @@ arduino-cli upload  --fqbn arduino:renesas_uno:unor4wifi --port /dev/ttyACM0 car
 or equivalent in the Arduino IDE 2.x.
 
 **Production (in-car):**
-- After v4 ships and OTA is validated: maintenance-mode upload via phone/laptop browser (§6.4).
-- If OTA path doesn't pan out: physical USB connection, same `arduino-cli upload` command from a laptop.
+- v4 production firmware updates are USB-cable only (§6.4).
+- Wireless update workflow is deferred to v4.x (§6.4.3).
 
-**Building a `.bin` for OTA (assuming OTA works):**
+**Building a `.bin` for future wireless OTA (deferred to v4.x):**
 ```
 arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --output-dir build carduino-v4/
 # build/carduino-v4.ino.bin is the upload artifact
@@ -771,10 +769,9 @@ arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --output-dir build card
 
 ### 11.5 Build-time configuration
 
-A `secrets.h` file (gitignored) holds:
+A `secrets.h` file (gitignored) is reserved for future v4.x wireless update work:
 ```c
-#define AP_PASSWORD "your-ap-password"
-// (No WiFi STA credentials needed — we don't connect to home WiFi in v4)
+// v4 does not require wireless update credentials (§6.4).
 ```
 
 A `secrets.h.template` is committed to the repo as a starting point.
@@ -794,10 +791,10 @@ To stage risk and produce intermediate working artifacts:
 | **7.** | Add BLE NUS peripheral + periodic dump + commands | Phone connects, sees data, can issue commands |
 | **8.** | Add boot self-tests + persistent state (reset cause, boot counter) | Forced failures display correct ERR##; boot counter survives reset |
 | **9.** | Add CAN RX filter for ID 1512 (RPM) + engine-running gate | Flatline detection only fires when RPM > 500 |
-| **10.** | Prototype OTA in standalone sketch (parallel to stages 1-9) | Some flavor of upload-and-apply works on the bench |
-| **11.** | Integrate OTA + maintenance mode if prototype succeeded | Full BLE→AP→upload→apply→reboot flow works end-to-end |
+| **10.** | Prototype wireless OTA in standalone sketch (deferred to v4.x) | See §6.4 |
+| **11.** | Integrate OTA + maintenance mode (deferred to v4.x) | See §6.4 |
 
-Stages 1-9 produce a functional in-car device with USB-cable OTA. Stages 10-11 are the wireless-OTA bonus; if they don't pan out, v4 still ships with stages 1-9.
+Stages 1-9 produce a functional in-car device with USB-cable updates. Stages 10-11 are deferred to v4.x (§6.4).
 
 ---
 
@@ -818,6 +815,6 @@ Cross-reviewed with codex on five occasions during design:
 
 1. **Architecture choice** — initially proposed FreeRTOS dual-task split for an assumed ESP32. After discovering hardware was actually Uno R4 WiFi (single-core), pivoted to super-loop. Codex confirmed correctness for the platform.
 2. **Sensor pipeline** — codex flagged EWMA α=0.20 as too responsive for noisy automotive senders (revised to 0.10), confirmed Bosch 0 261 230 146 is 3-pin MAP not 4-pin TMAP, recommended fault debounce + flatline detection.
-3. **Comms architecture (BLE vs WiFi)** — codex confirmed ArduinoBLE on R4 is mature enough for NUS-style serial console (with v0.6.0+ ConnectivityFirmware), but BLE OTA on R4 is "you'll regret this" (no maintained library; app runs on RA4M1 not ESP32-S3). Recommended BLE-only with on-demand WiFi-AP for OTA.
+3. **Comms architecture (BLE vs WiFi)** — codex confirmed ArduinoBLE on R4 is mature enough for NUS-style serial console (with v0.6.0+ ConnectivityFirmware), but BLE OTA on R4 is "you'll regret this" (no maintained library; app runs on RA4M1 not ESP32-S3). Wireless OTA was later deferred to v4.x (§6.4).
 4. **Error handling** — codex corrected MCP2515 TXERR > 96 as warning-only (not failure), recommended persistent reset cause + boot counter, suggested fault-class-specific debounce, flagged 30-sec maintenance watchdog as overgenerous (revised to 8 sec).
 5. **Final design review** — codex caught D13 pin map conflict (SPI SCK can't double as heartbeat LED, removed); flagged OTA flow as overstated (downgraded to "design intent / open risk"); identified missing BLE protocol details (added §6.7 with UUIDs, MTU, fragmentation, line conventions); identified missing implementation scaffolding (added §11 with toolchain, libraries, file layout, build/flash workflow, staged build order); expanded §9 bench-verify list with crank/brownout, CAN physical-layer, BLE MTU testing, ground-offset noise, and OTA recovery cases.
