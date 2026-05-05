@@ -92,6 +92,29 @@ static void cmd_cal(const char* args) {
     ble_println(buf);
 }
 
+static void cmd_reboot(const char* args) {
+    (void)args;
+    ble_println("rebooting in 1 sec...");
+    delay(1000);
+    NVIC_SystemReset();
+}
+
+static void cmd_help(const char* args) {
+    (void)args;
+    ble_println("commands:");
+    ble_println("  status                - one-shot dump");
+    ble_println("  cal <ch>              - raw ADC + voltage for channel");
+    ble_println("  boot                  - last reset cause + boot count");
+    ble_println("  log / log clear       - dump or wipe event log");
+    ble_println("  reboot                - soft reset");
+    ble_println("  reset can / reset ble - reinit subsystem");
+    ble_println("  clear errors          - reset event log + sticky bits");
+    ble_println("  selftest              - rerun boot self-tests");
+    ble_println("  maintenance / abort   - enter / cancel maint mode");
+    ble_println("  verbose on / off      - debug spam");
+    ble_println("  help                  - this list");
+}
+
 bool ble_init() {
     if (!BLE.begin()) {
         Serial.println(F("BLE.begin() failed"));
@@ -108,6 +131,8 @@ bool ble_init() {
 
     ble_register_command("status", cmd_status);
     ble_register_command("cal", cmd_cal);
+    ble_register_command("reboot", cmd_reboot);
+    ble_register_command("help",   cmd_help);
 
     BLE.advertise();
     ble_ok = true;
