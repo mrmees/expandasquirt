@@ -234,7 +234,8 @@ All Phase 1 tests run on the bench at desk-mounted hardware (R4 + MCP2515 stack 
 Deferred fix raised: Task 51 (oil pressure conversion for 5-bar absolute sender) — completed in commit `e2b654f`, bench-verified to read 0.0 PSI at atmospheric.
 
 Open items NOT addressed in this Phase 1 pass:
-- Fuel pressure sender (A3) and post-supercharger thermistor (A1) were not on the bench. Their channels read floating values during the test. Bench-validation for those two sensors deferred until they are physically present.
+- Fuel pressure sender (A3) was not on the bench. That channel reads a floating value during the test. Bench-validation for the fuel sender is deferred until it is physically present.
+- Post-supercharger thermistor (A1) was bench-validated in a follow-on session after the initial run — pipeline responsive to thermal stimulus, but reads with a ~+9 °F offset at room temp vs reference. Calibration mismatch tracked as Task 52 in `IMPLEMENTATION-PLAN.md` (deferred — not required for v4 ship).
 - Boot banner serial capture proved unreliable due to USB CDC re-enumeration timing on the Renesas R4. Captured indirectly via the watchdog reboot loop in 1.6. Not a firmware issue; documented for future test runs.
 
 ---
