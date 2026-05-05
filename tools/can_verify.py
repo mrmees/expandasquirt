@@ -69,6 +69,7 @@ def main() -> None:
     no_frame_warned = False
     last_health: int | None = None
     last_age: int | None = None
+    last_flags: int | None = None
 
     try:
         while True:
@@ -103,15 +104,23 @@ def main() -> None:
                             print(f"  !! SEQ skip: expected {expected}, got {seq}")
                     last_seq = seq
                     health = msg.data[5]
+                    flags = msg.data[6]
                     age = msg.data[7]
                     if args.changes_only:
-                        if health != last_health or age != last_age:
+                        if (health != last_health
+                            or flags != last_flags
+                            or age != last_age):
                             ts = time.strftime("%H:%M:%S")
                             h_from = f"0x{last_health:02X}" if last_health is not None else "init"
-                            a_from = f"{last_age}" if last_age is not None else "init"
-                            print(f"  [{ts}] CHANGE  health: {h_from}->0x{health:02X}  "
-                                  f"age: {a_from}->{age}  (Frame 2 = {data_hex})")
+                            f_from = f"0x{last_flags:02X}"  if last_flags  is not None else "init"
+                            a_from = f"{last_age}"           if last_age    is not None else "init"
+                            print(f"  [{ts}] CHANGE  "
+                                  f"health: {h_from}->0x{health:02X}  "
+                                  f"flags: {f_from}->0x{flags:02X}  "
+                                  f"age: {a_from}->{age}  "
+                                  f"(Frame 2 = {data_hex})")
                             last_health = health
+                            last_flags = flags
                             last_age = age
                     else:
                         print(f"  {id_hex}  {data_hex}  {decode_frame2(msg.data)}")
