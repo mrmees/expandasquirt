@@ -1,4 +1,5 @@
 #include "sensor_pipeline.h"
+#include "can_protocol.h"
 #include "sensor_health.h"
 #include <math.h>
 
@@ -65,12 +66,17 @@ static inline uint16_t clamp_to_u16(float v) {
 }
 
 static bool engine_running_now(int raw_oil_press, float oil_press_psi) {
+    // Primary: RPM from MS3 if recent (< 2 sec old).
+    if (can_rpm_age_ms() < 2000) {
+        return can_get_rpm() > ENGINE_RUNNING_RPM;
+    }
+    // Fallback: oil pressure threshold (single-tick health, no debounce).
     bool oil_press_healthy = !electrical_fault(raw_oil_press)
                              && plausibility_pressure_psi(oil_press_psi);
     if (oil_press_healthy) {
         return oil_press_psi > ENGINE_RUNNING_OIL_PSI;
     }
-    // Sensor faulted; assume running so flatline state is not falsely cleared.
+    // Both unavailable: assume running so flatline state is not falsely cleared.
     return true;
 }
 

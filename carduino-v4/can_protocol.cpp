@@ -26,10 +26,13 @@ void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, ui
 
 #include <SPI.h>
 #include <mcp2515.h>
+#include <stdint.h>
 #include "ble_console.h"
 
 static MCP2515 mcp2515(PIN_MCP2515_CS);
 SystemHealth gSystemHealth = {0};
+static uint16_t last_rpm = 0;
+static unsigned long last_rpm_ms = 0;
 
 void system_health_update() {
     uint8_t errflag = mcp2515.getErrorFlags();
@@ -129,6 +132,27 @@ void CanSendPhase() {
     memcpy(f2.data, buf, 8);
     // TODO(task-after-18): track sendMessage return values.
     mcp2515.sendMessage(&f2);
+}
+
+void CanReceivePhase() {
+    struct can_frame rx;
+    while (mcp2515.readMessage(&rx) == MCP2515::ERROR_OK) {
+        if (rx.can_id == CAN_RX_RPM_ID && rx.can_dlc >= 4) {
+            last_rpm = ((uint16_t)rx.data[2] << 8) | rx.data[3];
+            last_rpm_ms = millis();
+        }
+    }
+}
+
+uint16_t can_get_rpm() {
+    return last_rpm;
+}
+
+unsigned long can_rpm_age_ms() {
+    if (last_rpm_ms == 0) {
+        return UINT32_MAX;
+    }
+    return millis() - last_rpm_ms;
 }
 
 #endif

@@ -10,6 +10,9 @@ extern "C" {
 
 bool can_protocol_init();
 void CanSendPhase();
+void CanReceivePhase();
+uint16_t can_get_rpm();
+unsigned long can_rpm_age_ms();
 
 typedef struct {
     bool can_errors_warning;       // TXEP/RXEP set per Microchip

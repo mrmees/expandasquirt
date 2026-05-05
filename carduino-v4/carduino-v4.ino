@@ -99,7 +99,7 @@ void loop() {
         lastCanMs = now;
     }
 
-    // CanReceivePhase() — Task 36
+    CanReceivePhase();
 
     BleServicePhase();
 
