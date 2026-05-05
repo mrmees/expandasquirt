@@ -33,6 +33,13 @@ void channel_health_init(ChannelHealth* ch) {
     ch->flatline = false;
     ch->age_ticks = 0;
     ch->tick_subdiv = 0;
+    // TODO: age_ticks is documented as 100 ms units, but the implementation
+    // uses tick_subdiv to count SensorPhase calls (10 calls per increment).
+    // On real hardware SensorPhase runs at ~70 Hz (BLE.poll() and analogRead
+    // overhead), so each "tick" is actually ~143 ms wall time. Age direction
+    // is correct, magnitude is ~30% under-reported. To fix: replace
+    // tick_subdiv with a wall-clock delta from now_ms (already passed in).
+    // Will require updating the test helper to pass simulated now_ms.
 }
 
 void flatline_init(FlatlineState* f) {
