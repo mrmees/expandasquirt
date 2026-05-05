@@ -5327,42 +5327,27 @@ void maintenance_tick(uint32_t now) {
 }
 ```
 
-- [ ] **Step 3a: Verify the JAndrassy callback API shape**
+- [ ] **Step 3: Wire ArduinoOTA callbacks to transition state**
 
-Before writing the callback code below, **read the actual library headers** to confirm the registration mechanism. The library has shipped at least two patterns historically: direct field assignment vs. setter methods. Either pattern works equivalently; we just need to use the right syntax.
+API confirmed at JAndrassy/ArduinoOTA v1.1.1 (`WiFiOTA.h`): callbacks are registered via **setter methods**, not field assignment. Public surface is:
 
-```bash
-# JAndrassy library files cached in Task 53; if not present:
-ls $(arduino-cli config dump | grep user)/libraries/ArduinoOTA/src/WiFiOTA.h
+```cpp
+void onStart(void (*fn)(void));
+void onError(void (*fn)(int code, const char* msg));
+void beforeApply(void (*fn)(void));
 ```
 
-Look for the public surface: do `onStartCallback`, `onErrorCallback`, `beforeApplyCallback` appear as `public:` fields (assignable directly), or as `void setOnStartCallback(...)` setters? Note also the exact callback signature — some versions take `void()`, others may take additional context args.
-
-Record findings inline at the top of `maintenance_mode.cpp`:
-```c
-// JAndrassy/ArduinoOTA callback API (as of <commit/version>):
-//   - <FIELD or SETTER>: <exact signature>
-```
-
-- [ ] **Step 3b: Wire ArduinoOTA callbacks to transition state**
-
-Use whichever syntax matches the library version. Both forms shown for reference:
+Function pointers (not `std::function`), so callbacks must be captureless — plain free functions or captureless lambdas only.
 
 ```c
-// If callbacks are public fields (older API):
-ArduinoOTA.onStartCallback = []() {
+// At setup, or first entry to MM_OTA_READY (idempotent):
+ArduinoOTA.onStart([]() {
     transition_to(MMState::UPLOAD_APPLYING, millis());
-};
-ArduinoOTA.onErrorCallback = [](int code, const char* status) {
+});
+ArduinoOTA.onError([](int code, const char* status) {
     transition_to(MMState::OTA_ERROR, millis());
-};
-
-// If callbacks are setters (newer API):
-// ArduinoOTA.setOnStartCallback([]() { ... });
-// ArduinoOTA.setOnErrorCallback([](int, const char*) { ... });
+});
 ```
-
-The wiring happens once at `MM_OTA_READY` entry (or earlier — they're idempotent registration calls).
 
 - [ ] **Step 4: Call `maintenance_tick(millis())` from main loop**
 
