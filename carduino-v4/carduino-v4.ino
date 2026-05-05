@@ -25,10 +25,19 @@ void setup() {
     ErrCode boot_err = run_boot_self_tests();
     if (boot_err == ERR_ADC) {
         Serial.println(F("Halting on ADC failure"));
-        while (1) delay(1000);  // halt; LED matrix display lands in Task 22
+        display_set_error(1);  // ERR01
+        while (1) {
+            DisplayUpdate();
+            delay(50);
+        }
+    }
+    if (boot_err == ERR_CAN) {
+        display_set_error(2);  // ERR02 - degraded mode, do not halt
     }
 
-    display_set_mode(DISP_NORMAL);
+    if (boot_err == ERR_NONE) {
+        display_set_mode(DISP_NORMAL);
+    }
 
     // Phases will be initialized as they are added in subsequent tasks
 }
