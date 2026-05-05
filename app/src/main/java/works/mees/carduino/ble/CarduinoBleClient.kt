@@ -8,13 +8,18 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -59,9 +64,35 @@ class CarduinoBleClient(private val ctx: Context) {
     private val writeCompletion = LinkedBlockingQueue<Int>(1)
     private var negotiatedMtu = 23  // BLE 4.x default; bumped via onMtuChanged
 
+    // Autoreconnect is active only for a remembered target MAC after a normal
+    // connect request. Peer disconnects and synchronous connect failures enter
+    // the backoff cycle; explicit user disconnects suppress it and clear target.
+    // Activity ON_PAUSE cancels pending retries without clearing target, and
+    // ON_RESUME restarts the cycle if the link is still down. The public
+    // connect() path resets attempts; internal retries preserve the counter
+    // until a service-discovered connection proves the link is healthy.
+    private val scope: CoroutineScope = MainScope()
+
+    // Backoff schedule (ms): immediate, 1s, 5s, 15s, 30s, 60s, then 60s ceiling.
+    private val backoff = listOf(0L, 1_000L, 5_000L, 15_000L, 30_000L, 60_000L)
+    private var attempt = 0
+    private var paused = false
+    private var targetMac: String? = null
+    private var userInitiatedDisconnect = false
+    private var reconnectJob: Job? = null
+
     fun connect(mac: String) {
+        targetMac = mac
+        userInitiatedDisconnect = false
+        attempt = 0
+        reconnectJob?.cancel()
+        reconnectJob = null
+        attemptConnect(mac)
+    }
+
+    private fun attemptConnect(mac: String) {
         if (_state.value is BleState.Connecting || _state.value is BleState.Connected) {
-            // Already busy; let the existing connection finish.
+            // Already busy; skip silently.
             return
         }
         _state.value = BleState.Connecting(mac)
@@ -72,11 +103,55 @@ class CarduinoBleClient(private val ctx: Context) {
             gatt = device.connectGatt(ctx, /* autoConnect = */ false, callback)
         } catch (e: Exception) {
             _state.value = BleState.Failed(mac, e.javaClass.simpleName + ": " + e.message)
+            // Treat synchronous failures as triggering the backoff cycle, same
+            // as an asynchronous STATE_DISCONNECTED event.
+            if (!userInitiatedDisconnect) scheduleReconnect(mac)
         }
     }
 
     fun disconnect() {
+        userInitiatedDisconnect = true
+        targetMac = null
+        reconnectJob?.cancel()
+        reconnectJob = null
         gatt?.disconnect()
+    }
+
+    /** Called when the host Activity goes to ON_PAUSE -- stop scheduling reconnects. */
+    fun pauseReconnect() {
+        paused = true
+        reconnectJob?.cancel()
+        reconnectJob = null
+    }
+
+    /** Called when the host Activity returns ON_RESUME -- resume reconnect cycle if appropriate. */
+    fun resumeReconnect() {
+        if (!paused) return
+        paused = false
+        val mac = targetMac ?: return
+        if (userInitiatedDisconnect) return
+        val s = _state.value
+        if (s is BleState.Connecting || s is BleState.Connected) return
+        // Restart the backoff fresh on resume; the situation may have changed
+        // while backgrounded.
+        attempt = 0
+        scheduleReconnect(mac)
+    }
+
+    private fun scheduleReconnect(mac: String) {
+        if (paused || userInitiatedDisconnect) return
+        if (mac != targetMac) return  // staleness check; user may have moved on
+        reconnectJob?.cancel()
+        val delayMs = backoff.getOrElse(attempt) { 60_000L }
+        attempt++
+        reconnectJob = scope.launch {
+            delay(delayMs)
+            // Re-check state right before reconnecting; conditions may have
+            // changed during the delay.
+            if (paused || userInitiatedDisconnect) return@launch
+            if (mac != targetMac) return@launch
+            attemptConnect(mac)
+        }
     }
 
     /**
@@ -117,6 +192,10 @@ class CarduinoBleClient(private val ctx: Context) {
                     rxChar = null
                     lineBuf.clear()
                     _state.value = BleState.Idle
+                    val mac = targetMac
+                    if (mac != null && !userInitiatedDisconnect && !paused) {
+                        scheduleReconnect(mac)
+                    }
                 }
             }
         }
@@ -143,6 +222,7 @@ class CarduinoBleClient(private val ctx: Context) {
             g.requestMtu(247)
 
             _state.value = BleState.Connected(g.device.address)
+            attempt = 0
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
