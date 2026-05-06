@@ -27,7 +27,11 @@ import androidx.compose.ui.unit.sp
 /** Diagnostics actions for querying status, boot metadata, help, and reboot over BLE. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiagnosticsScreen(vm: DiagnosticsViewModel, onBack: () -> Unit) {
+fun DiagnosticsScreen(
+    vm: DiagnosticsViewModel,
+    onBack: () -> Unit,
+    onUsbRescue: () -> Unit,
+) {
     val out by vm.output.collectAsState()
 
     Scaffold(
@@ -54,6 +58,10 @@ fun DiagnosticsScreen(vm: DiagnosticsViewModel, onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = { vm.run("help") }) { Text("Help") }
                 FilledTonalButton(onClick = { vm.run("reboot") }) { Text("Reboot") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = onUsbRescue) { Text("USB rescue") }
             }
             Spacer(Modifier.height(16.dp))
             Surface(modifier = Modifier.fillMaxSize(), tonalElevation = 1.dp) {

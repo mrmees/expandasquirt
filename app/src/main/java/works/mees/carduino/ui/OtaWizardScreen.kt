@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +42,7 @@ fun OtaWizardScreen(
     otaVm: OtaViewModel,
     hotspotVm: HotspotSetupViewModel,
     onExit: () -> Unit,
+    onUsbRescue: () -> Unit,
 ) {
     val step by otaVm.step.collectAsState()
     val ctx = LocalContext.current
@@ -93,7 +93,7 @@ fun OtaWizardScreen(
                 OtaStep.Applying -> BusyStep("Carduino is flashing the firmware. Don't disturb.")
                 OtaStep.Verifying -> BusyStep("Verifying new firmware version...")
                 is OtaStep.Done -> DoneStep(currentStep, otaVm, onExit)
-                is OtaStep.Failed -> FailedStep(currentStep, otaVm, onExit)
+                is OtaStep.Failed -> FailedStep(currentStep, otaVm, onExit, onUsbRescue)
                 is OtaStep.HotspotSetup -> Unit
             }
         }
@@ -282,9 +282,8 @@ private fun FailedStep(
     step: OtaStep.Failed,
     otaVm: OtaViewModel,
     onExit: () -> Unit,
+    onUsbRescue: () -> Unit,
 ) {
-    var showUsbRescue by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -316,31 +315,11 @@ private fun FailedStep(
         }
         if (step.showUsbRescue) {
             TextButton(
-                onClick = { showUsbRescue = true },
+                onClick = onUsbRescue,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("USB rescue")
             }
         }
-    }
-
-    if (showUsbRescue) {
-        AlertDialog(
-            onDismissRequest = { showUsbRescue = false },
-            confirmButton = {
-                TextButton(onClick = { showUsbRescue = false }) {
-                    Text("OK")
-                }
-            },
-            title = { Text("USB rescue") },
-            text = {
-                Text(
-                    "USB rescue screen - coming in Task 76. For now: plug USB, " +
-                        "double-tap reset, run `arduino-cli upload --fqbn " +
-                        "arduino:renesas_uno:unor4wifi --port <PORT> " +
-                        "/path/to/carduino-v4/`",
-                )
-            },
-        )
     }
 }

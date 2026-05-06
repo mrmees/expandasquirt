@@ -35,6 +35,7 @@ import works.mees.carduino.ui.HotspotSetupViewModel
 import works.mees.carduino.ui.OtaViewModel
 import works.mees.carduino.ui.OtaWizardScreen
 import works.mees.carduino.ui.PermissionsGate
+import works.mees.carduino.ui.UsbRescueScreen
 
 /**
  * App entry. Wraps content in a runtime-permission gate before hosting the
@@ -152,6 +153,7 @@ class MainActivity : ComponentActivity() {
                                 DiagnosticsScreen(
                                     vm = diagVm,
                                     onBack = { nav.popBackStack() },
+                                    onUsbRescue = { nav.navigate("usb_rescue") },
                                 )
                             }
                             composable("ota") {
@@ -197,7 +199,11 @@ class MainActivity : ComponentActivity() {
                                     otaVm = otaVm,
                                     hotspotVm = hotspotVm,
                                     onExit = { nav.popBackStack() },
+                                    onUsbRescue = { nav.navigate("usb_rescue") },
                                 )
+                            }
+                            composable("usb_rescue") {
+                                UsbRescueScreen(onBack = { nav.popBackStack() })
                             }
                         }
                     }
