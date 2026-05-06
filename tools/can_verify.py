@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CARDUINO v4 CAN bus verification tool.
+EXPANDASQUIRT v4 CAN bus verification tool.
 
 Listens on a CAN interface (default: CANable v2 slcan @ 500kbps on COM9)
 and decodes Frame 1 (0x401) + Frame 2 (0x402) per the design doc layout.

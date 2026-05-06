@@ -1,4 +1,4 @@
-# CARDUINO v4 — Design Specification
+# EXPANDASQUIRT v4 — Design Specification
 
 **Date:** 2026-05-04
 **Project:** Sensor adapter for MS3Pro PNP (2000 NB1 Miata, MP62 supercharged)
@@ -9,7 +9,7 @@
 
 ## 1. Overview
 
-CARDUINO v4 is a small in-cabin device that reads five aftermarket analog sensors, broadcasts their values to the MS3Pro PNP ECU over the option-port CAN bus at 10 Hz, and supports wireless firmware updates via Bluetooth-triggered WiFi access point mode.
+EXPANDASQUIRT v4 is a small in-cabin device that reads five aftermarket analog sensors, broadcasts their values to the MS3Pro PNP ECU over the option-port CAN bus at 10 Hz, and supports wireless firmware updates via Bluetooth-triggered WiFi access point mode.
 
 This is a clean rewrite replacing v3, which used an Arduino Uno R3 and a bare MCP2515 module. v4 targets a Freenove FNK0096 (Uno R4 WiFi clone) with a Keyestudio EF02037 MCP2515 CAN-Bus Shield.
 
@@ -111,9 +111,9 @@ Buck-boost regulator (Amazon B07WY4P7W8)
     ├ Soft-start delay: ≤2 sec on power-up
     └ No-load: ≤10 mA
     ↓
-1A polyfuse (insurance against Carduino-internal short)
+1A polyfuse (insurance against Expandasquirt-internal short)
     ↓
-Carduino VIN (12V → onboard ISL854102 buck → 5V rails)
+Expandasquirt VIN (12V → onboard ISL854102 buck → 5V rails)
     ├ ISL854102 efficiency ~85-90% in this range
     ├ Heat in ISL854102 at worst-case 460 mA load: ~0.35 W (negligible)
     └ 5V rail powers MCP2515 shield + all sensor V+ supplies
@@ -378,7 +378,7 @@ All other CAN traffic on the bus is filtered out at the MCP2515 hardware level. 
 
 ### 6.1 Default state: BLE Serial console, WiFi off
 
-The Carduino advertises a BLE peripheral with a **Nordic UART Service (NUS)**-style profile — two characteristics, TX (notify) for output, RX (write) for input. Standard phone apps (`Serial Bluetooth Terminal`, `nRF Connect`) speak this directly.
+The Expandasquirt advertises a BLE peripheral with a **Nordic UART Service (NUS)**-style profile — two characteristics, TX (notify) for output, RX (write) for input. Standard phone apps (`Serial Bluetooth Terminal`, `nRF Connect`) speak this directly.
 
 - Always advertising during v4 normal operation; maintenance mode is deferred to v4.x (§6.4)
 - Single client at a time
@@ -420,7 +420,7 @@ release that will ship together with a companion Android app (see §6.4.3).
 #### 6.4.1 Today's workflow (USB)
 
 1. Open the enclosure (or just keep it open during dev iteration).
-2. `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> carduino-v4/`
+2. `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> expandasquirt-v4/`
 3. Sketch resets and reboots into the new firmware.
 
 This is the same workflow used throughout v4 development. No external services,
@@ -502,19 +502,19 @@ Wireless OTA is deferred to v4.x; the current roadmap is in §6.4.
 **Service UUID:** `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` (Nordic UART Service standard)
 
 **Characteristics (NUS standard UUIDs for app compatibility):**
-- **TX (notify):** `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` — Carduino → phone
-- **RX (write):** `6E400002-B5A3-F393-E0A9-E50E24DCCA9E` — phone → Carduino
+- **TX (notify):** `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` — Expandasquirt → phone
+- **RX (write):** `6E400002-B5A3-F393-E0A9-E50E24DCCA9E` — phone → Expandasquirt
 
 Using the standard NUS UUIDs (rather than custom) means `Serial Bluetooth Terminal`, `nRF Connect`, and most generic BLE serial apps recognize the service automatically without configuration.
 
-**Device name (advertised):** `CARDUINO-v4` (visible in BLE scanners)
+**Device name (advertised):** `EXPANDASQUIRT-v4` (visible in BLE scanners)
 
 **MTU and fragmentation:**
 - BLE 4.x default MTU is 23 bytes (20 byte payload after ATT overhead)
 - BLE 4.2+ supports MTU up to 247 bytes
 - ArduinoBLE on R4 negotiates MTU at connection time
-- **Carduino TX behavior:** lines longer than 19 bytes are split across multiple `notify` calls. Each call sends one MTU-bounded chunk; phone-side reassembly is the app's responsibility (most BLE serial apps handle this transparently).
-- **Carduino RX behavior:** commands are framed by `\n` (newline). Multiple commands in a single write packet are processed sequentially; commands fragmented across packets are accumulated in a 64-byte input buffer until `\n` arrives. Buffer overrun (>64 bytes without `\n`) discards the buffer and logs a warning.
+- **Expandasquirt TX behavior:** lines longer than 19 bytes are split across multiple `notify` calls. Each call sends one MTU-bounded chunk; phone-side reassembly is the app's responsibility (most BLE serial apps handle this transparently).
+- **Expandasquirt RX behavior:** commands are framed by `\n` (newline). Multiple commands in a single write packet are processed sequentially; commands fragmented across packets are accumulated in a 64-byte input buffer until `\n` arrives. Buffer overrun (>64 bytes without `\n`) discards the buffer and logs a warning.
 
 **Line conventions:**
 - Output uses `\r\n` line endings (CR+LF) for terminal-app compatibility
@@ -525,7 +525,7 @@ Using the standard NUS UUIDs (rather than custom) means `Serial Bluetooth Termin
 
 **Connection state model:**
 - Single client at a time (peripheral connection limit = 1)
-- On connect: Carduino sends a banner with reset cause + boot counter + last fatal err
+- On connect: Expandasquirt sends a banner with reset cause + boot counter + last fatal err
 - On disconnect: advertising resumes within ~500 ms
 - No pairing/bonding — open connection (acceptable for hobby use; phone app's job to filter trusted device names)
 
@@ -673,8 +673,8 @@ The following items are placeholders in the design that need bench verification 
 
 ### In-car physical/integration verification
 9. **CAN bus physical layer** — verify the option-port CAN bus has proper 120Ω termination and a clean ground reference. Check error counters on MS3 side after install. Bus-level integrity issues will manifest as TXERR/RXERR escalation that no amount of firmware tuning can fix.
-10. **Crank/brownout behavior of the entire power chain** — verify the buck-boost holds up through a cold-crank dip without browning out the Carduino. Test by cranking the engine and watching for spurious resets in the boot counter.
-11. **Sensor ground-offset noise with engine running** — verify there's no measurable ground-loop voltage between the Carduino's GND and the sensor case grounds when the engine is running and the alternator is loaded. Pressure sensors sharing the 5V rail are most exposed if there's a ground offset between the Carduino's reference and the engine block.
+10. **Crank/brownout behavior of the entire power chain** — verify the buck-boost holds up through a cold-crank dip without browning out the Expandasquirt. Test by cranking the engine and watching for spurious resets in the boot counter.
+11. **Sensor ground-offset noise with engine running** — verify there's no measurable ground-loop voltage between the Expandasquirt's GND and the sensor case grounds when the engine is running and the alternator is loaded. Pressure sensors sharing the 5V rail are most exposed if there's a ground offset between the Expandasquirt's reference and the engine block.
 
 ### Recovery behaviors
 12. **Interrupted OTA upload** — DEFERRED to v4.x with wireless OTA (§6.4).
@@ -721,14 +721,14 @@ The following items are placeholders in the design that need bench verification 
 ### 11.3 Repository file layout
 
 ```
-projects/carduino-v4/
+projects/expandasquirt-v4/
 ├── DESIGN.md                       # This file
 ├── README.md                       # Build / flash / wiring quickstart
 ├── secrets.h.template              # Template for secrets.h
 ├── secrets.h                       # gitignored — v4.x wireless update secrets, if needed
 ├── libraries.txt                   # Pinned library versions
-├── carduino-v4/                    # Arduino sketch root
-│   ├── carduino-v4.ino             # setup() / loop() — minimal, dispatches to phases
+├── expandasquirt-v4/                    # Arduino sketch root
+│   ├── expandasquirt-v4.ino             # setup() / loop() — minimal, dispatches to phases
 │   ├── config.h                    # All tunable constants (pin map, EWMA α, thresholds)
 │   ├── sensor_pipeline.h/.cpp      # ADC read, EWMA, Steinhart-Hart, conversions
 │   ├── sensor_health.h/.cpp        # Per-sensor fault state machines, debounce
@@ -758,8 +758,8 @@ projects/carduino-v4/
 
 **Bench/development (primary):**
 ```
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
-arduino-cli upload  --fqbn arduino:renesas_uno:unor4wifi --port /dev/ttyACM0 carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli upload  --fqbn arduino:renesas_uno:unor4wifi --port /dev/ttyACM0 expandasquirt-v4/
 ```
 or equivalent in the Arduino IDE 2.x.
 
@@ -769,8 +769,8 @@ or equivalent in the Arduino IDE 2.x.
 
 **Building a `.bin` for future wireless OTA (deferred to v4.x):**
 ```
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --output-dir build carduino-v4/
-# build/carduino-v4.ino.bin is the upload artifact
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --output-dir build expandasquirt-v4/
+# build/expandasquirt-v4.ino.bin is the upload artifact
 ```
 
 ### 11.5 Build-time configuration
@@ -811,7 +811,7 @@ Stages 1-9 produce a functional in-car device with USB-cable updates. Stages 10-
 - [autowp/arduino-mcp2515 library](https://github.com/autowp/arduino-mcp2515)
 - [Renesas RA4M1 hardware manual](https://www.renesas.com/en/document/mah/renesas-ra4m1-group-users-manual-hardware)
 - [Microchip MCP2515 datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/MCP2515-Family-Data-Sheet-DS20001801K.pdf)
-- v3 source: `projects/CARDUINO_v3/`
+- v3 source: `projects/EXPANDASQUIRT_v3/`
 - Project memory: `personal/miata/CLAUDE.md`
 - MS3Pro PNP capabilities: `personal/miata/knowledge/ms3/ms3pro-pnp-capabilities.md`
 

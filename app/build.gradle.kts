@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "works.mees.carduino"
+    namespace = "works.mees.expandasquirt"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "works.mees.carduino"
+        applicationId = "works.mees.expandasquirt"
         minSdk = 26          // Android 8.0 — WifiManager.startLocalOnlyHotspot() base API
         targetSdk = 36       // Android 16 — startLocalOnlyHotspotWithConfiguration (forced WPA2 for OTA)
         versionCode = 1
@@ -45,9 +45,11 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.4")

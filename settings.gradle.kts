@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "carduino"
+rootProject.name = "expandasquirt-v4"
 include(":app")

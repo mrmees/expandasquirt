@@ -2,7 +2,7 @@
 // argument parser (V4X-DESIGN.md §5.1, IMPLEMENTATION-PLAN.md Task 58).
 // Included by test_main.cpp.
 
-#include "../carduino-v4/maintenance_args.h"
+#include "../expandasquirt-v4/maintenance_args.h"
 
 TEST_CASE(maint_args_happy_path) {
     MaintenanceArgs args;

@@ -1,4 +1,4 @@
-# CARDUINO v4 Implementation Plan
+# EXPANDASQUIRT v4 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -17,11 +17,11 @@
 - **🔧 Bench-verified:** Hardware-dependent, standalone sketch in `prototypes/` with documented expected outcome (USB-CAN dongle output, voltmeter reading, BLE app behavior)
 - **🚗 In-car-verified:** Full system test, drive cycle datalog or post-install procedure
 
-**Files:** Paths are relative to `projects/carduino-v4/` unless otherwise noted.
+**Files:** Paths are relative to `projects/expandasquirt-v4/` unless otherwise noted.
 
 **Commits:** Each task ends with a git commit. Commit messages follow `<type>: <description>` format (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`).
 
-**Where the user runs commands:** assume Git Bash on Windows from `E:/claude/personal/miata/projects/carduino-v4/`.
+**Where the user runs commands:** assume Git Bash on Windows from `E:/claude/personal/miata/projects/__OUTER_EXPANDASQUIRT_ROOT__/`.
 
 ---
 
@@ -66,7 +66,7 @@ Thumbs.db
 - [ ] **Step 3: Create skeleton `README.md`**
 
 ```markdown
-# CARDUINO v4
+# EXPANDASQUIRT v4
 
 Sensor adapter for MS3Pro PNP on a 2000 NB1 Miata. See `DESIGN.md` for the full spec.
 
@@ -75,12 +75,12 @@ TBD — populated when implementation lands.
 
 ## Build
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 ## Flash
 ```bash
-arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> carduino-v4/
+arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/
 ```
 ```
 
@@ -131,7 +131,7 @@ Expected: all four listed (`ArduinoBLE`, `Arduino_LED_Matrix`, `mcp2515`, plus `
 - [ ] **Step 4: Create `libraries.txt`**
 
 ```
-# CARDUINO v4 — pinned library versions
+# EXPANDASQUIRT v4 — pinned library versions
 # Update this file whenever bumping a dependency.
 
 arduino:renesas_uno @ <RECORD ACTUAL VERSION FROM STEP 2>
@@ -175,8 +175,8 @@ git commit -m "chore: pin toolchain and library versions"
 ### Task 3: Sketch skeleton with super-loop dispatcher
 
 **Files:**
-- Create: `carduino-v4/carduino-v4.ino`
-- Create: `carduino-v4/config.h`
+- Create: `expandasquirt-v4/expandasquirt-v4.ino`
+- Create: `expandasquirt-v4/config.h`
 - Create: `secrets.h.template`
 
 - [ ] **Step 1: Create `secrets.h.template`**
@@ -200,7 +200,7 @@ cp secrets.h.template secrets.h
 
 Edit `secrets.h` to set `AP_PASSWORD` to your chosen value.
 
-- [ ] **Step 3: Create `carduino-v4/config.h` with all design-doc constants**
+- [ ] **Step 3: Create `expandasquirt-v4/config.h` with all design-doc constants**
 
 ```c
 #ifndef CONFIG_H
@@ -274,21 +274,21 @@ Edit `secrets.h` to set `AP_PASSWORD` to your chosen value.
 #define ENGINE_RUNNING_OIL_PSI 5
 
 // ===== BLE =====
-#define BLE_DEVICE_NAME       "CARDUINO-v4"
+#define BLE_DEVICE_NAME       "EXPANDASQUIRT-v4"
 #define BLE_SERVICE_UUID      "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_TX_CHAR_UUID      "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_CHAR_UUID      "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_BUFFER_SIZE    64
 
 // ===== AP =====
-#define AP_SSID  "CARDUINO-OTA"
+#define AP_SSID  "EXPANDASQUIRT-OTA"
 // AP_PASSWORD comes from secrets.h
 #define AP_GATEWAY_IP_LAST_OCTET  1   // 192.168.4.1
 
 #endif
 ```
 
-- [ ] **Step 4: Create `carduino-v4/carduino-v4.ino` skeleton**
+- [ ] **Step 4: Create `expandasquirt-v4/expandasquirt-v4.ino` skeleton**
 
 ```c
 #include "config.h"
@@ -304,7 +304,7 @@ void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 3000) { /* wait briefly for USB */ }
 
-    Serial.println(F("CARDUINO v4 booting..."));
+    Serial.println(F("EXPANDASQUIRT v4 booting..."));
 
     analogReadResolution(ADC_RESOLUTION_BITS);
 
@@ -347,7 +347,7 @@ void loop() {
 - [ ] **Step 5: Compile to verify it builds**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 Expected: clean compile, no errors. Output ends with sketch size statistics.
@@ -355,7 +355,7 @@ Expected: clean compile, no errors. Output ends with sketch size statistics.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/ secrets.h.template
+git add expandasquirt-v4/ secrets.h.template
 git commit -m "feat: super-loop skeleton with config.h"
 ```
 
@@ -452,7 +452,7 @@ int main() {
 #!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
-g++ -std=c++17 -Wall -Wextra -I. -I../carduino-v4 test_main.cpp -o test_runner
+g++ -std=c++17 -Wall -Wextra -I. -I../expandasquirt-v4 test_main.cpp -o test_runner
 ./test_runner
 ```
 
@@ -488,8 +488,8 @@ git commit -m "test: host-side test harness with assert macros"
 ### Task 5: Steinhart-Hart thermistor conversion + tests
 
 **Files:**
-- Create: `carduino-v4/sensor_pipeline.h`
-- Create: `carduino-v4/sensor_pipeline.cpp`
+- Create: `expandasquirt-v4/sensor_pipeline.h`
+- Create: `expandasquirt-v4/sensor_pipeline.cpp`
 - Create: `tests/test_sensor_pipeline.cpp`
 - Modify: `tests/test_main.cpp`
 
@@ -544,7 +544,7 @@ with:
 
 Expected: linker error — `thermistor_to_F` undefined.
 
-- [ ] **Step 4: Create `carduino-v4/sensor_pipeline.h`**
+- [ ] **Step 4: Create `expandasquirt-v4/sensor_pipeline.h`**
 
 ```c
 #ifndef SENSOR_PIPELINE_H
@@ -585,7 +585,7 @@ the matching definition in the `.cpp` has C linkage so symbols line up
 at link time. Apply this same idiom to `can_protocol.h`, `sensor_health.h`,
 etc. as they're added.
 
-- [ ] **Step 5: Create `carduino-v4/sensor_pipeline.cpp` with thermistor function**
+- [ ] **Step 5: Create `expandasquirt-v4/sensor_pipeline.cpp` with thermistor function**
 
 ```c
 #include "sensor_pipeline.h"
@@ -620,8 +620,8 @@ Note: `pressure_psi` and `bosch_kpa` are stubs at this point so the file compile
 #!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
-g++ -std=c++17 -Wall -Wextra -I. -I../carduino-v4 \
-    test_main.cpp ../carduino-v4/sensor_pipeline.cpp \
+g++ -std=c++17 -Wall -Wextra -I. -I../expandasquirt-v4 \
+    test_main.cpp ../expandasquirt-v4/sensor_pipeline.cpp \
     -o test_runner -lm
 ./test_runner
 ```
@@ -646,7 +646,7 @@ Tests complete: 3 passed, 0 failed
 - [ ] **Step 8: Commit**
 
 ```bash
-git add carduino-v4/sensor_pipeline.h carduino-v4/sensor_pipeline.cpp tests/
+git add expandasquirt-v4/sensor_pipeline.h expandasquirt-v4/sensor_pipeline.cpp tests/
 git commit -m "feat: thermistor Steinhart-Hart conversion with tests"
 ```
 
@@ -757,8 +757,8 @@ git commit -m "test: Bosch MAP conversion"
 ### Task 8: EWMA filter + tests
 
 **Files:**
-- Modify: `carduino-v4/sensor_pipeline.h`
-- Modify: `carduino-v4/sensor_pipeline.cpp`
+- Modify: `expandasquirt-v4/sensor_pipeline.h`
+- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
 - Modify: `tests/test_sensor_pipeline.cpp`
 
 - [ ] **Step 1: Write tests FIRST**
@@ -829,7 +829,7 @@ float ewma_step(float current, float new_sample, float alpha) {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/sensor_pipeline.{h,cpp} tests/test_sensor_pipeline.cpp
+git add expandasquirt-v4/sensor_pipeline.{h,cpp} tests/test_sensor_pipeline.cpp
 git commit -m "feat: EWMA filter with tests"
 ```
 
@@ -838,13 +838,13 @@ git commit -m "feat: EWMA filter with tests"
 ### Task 9: SensorState struct + read/filter/convert in production sketch
 
 **Files:**
-- Modify: `carduino-v4/sensor_pipeline.h`
-- Modify: `carduino-v4/sensor_pipeline.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/sensor_pipeline.h`
+- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Add `SensorState` and `SensorPhase()` declarations to header**
 
-Append to `carduino-v4/sensor_pipeline.h`:
+Append to `expandasquirt-v4/sensor_pipeline.h`:
 
 ```c
 #include <stdint.h>
@@ -933,9 +933,9 @@ void SensorPhase() {
 }
 ```
 
-- [ ] **Step 3: Wire into `carduino-v4.ino`**
+- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
 
-Modify `carduino-v4/carduino-v4.ino`:
+Modify `expandasquirt-v4/expandasquirt-v4.ino`:
 
 Add at top:
 ```c
@@ -965,7 +965,7 @@ if (now - lastPrintMs >= 500) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 Expected: clean compile.
@@ -979,7 +979,7 @@ Wire up:
 
 Flash:
 ```bash
-arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> carduino-v4/
+arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/
 ```
 
 Open serial monitor at 115200 baud. Sweep the pot. Expected:
@@ -990,7 +990,7 @@ Open serial monitor at 115200 baud. Sweep the pot. Expected:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: SensorPhase reads, filters, converts all 5 channels"
 ```
 
@@ -1001,11 +1001,11 @@ git commit -m "feat: SensorPhase reads, filters, converts all 5 channels"
 ### Task 10: MCP2515 init + boot self-test
 
 **Files:**
-- Create: `carduino-v4/can_protocol.h`
-- Create: `carduino-v4/can_protocol.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Create: `expandasquirt-v4/can_protocol.h`
+- Create: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
-- [ ] **Step 1: Create `carduino-v4/can_protocol.h`**
+- [ ] **Step 1: Create `expandasquirt-v4/can_protocol.h`**
 
 ```c
 #ifndef CAN_PROTOCOL_H
@@ -1023,7 +1023,7 @@ void CanSendPhase();
 #endif
 ```
 
-- [ ] **Step 2: Create `carduino-v4/can_protocol.cpp` skeleton with init + self-test**
+- [ ] **Step 2: Create `expandasquirt-v4/can_protocol.cpp` skeleton with init + self-test**
 
 ```c
 #include "can_protocol.h"
@@ -1081,7 +1081,7 @@ void CanSendPhase() {
 }
 ```
 
-- [ ] **Step 3: Wire into `carduino-v4.ino`**
+- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
 
 Add `#include "can_protocol.h"` at top.
 
@@ -1096,7 +1096,7 @@ if (!can_protocol_init()) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 - [ ] **Step 5: 🔧 Bench-verify**
@@ -1105,7 +1105,7 @@ Plug the MCP2515 EF02037 shield onto the R4. Apply USB power. Open serial monito
 
 Expected:
 ```
-CARDUINO v4 booting...
+EXPANDASQUIRT v4 booting...
 MCP2515 init OK
 oilT=... ...
 ```
@@ -1115,7 +1115,7 @@ If `MCP2515 init failed` appears, troubleshoot before proceeding (check shield s
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/can_protocol.{h,cpp} carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/can_protocol.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "feat: MCP2515 init with loopback self-test"
 ```
 
@@ -1124,8 +1124,8 @@ git commit -m "feat: MCP2515 init with loopback self-test"
 ### Task 11: Frame 1 byte packing + tests
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.h`
-- Modify: `carduino-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/can_protocol.h`
+- Modify: `expandasquirt-v4/can_protocol.cpp`
 - Create: `tests/test_can_protocol.cpp`
 - Modify: `tests/test_main.cpp`
 - Modify: `tests/run-tests.sh`
@@ -1175,8 +1175,8 @@ Add `#include "test_can_protocol.cpp"`.
 - [ ] **Step 4: Update `tests/run-tests.sh`** to include `can_protocol.cpp`
 
 ```bash
-g++ -std=c++17 -Wall -Wextra -I. -I../carduino-v4 \
-    test_main.cpp ../carduino-v4/sensor_pipeline.cpp ../carduino-v4/can_protocol.cpp \
+g++ -std=c++17 -Wall -Wextra -I. -I../expandasquirt-v4 \
+    test_main.cpp ../expandasquirt-v4/sensor_pipeline.cpp ../expandasquirt-v4/can_protocol.cpp \
     -o test_runner -lm
 ```
 
@@ -1218,7 +1218,7 @@ Wrap the Arduino-specific bits in `#ifdef ARDUINO`:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add carduino-v4/can_protocol.{h,cpp} tests/
+git add expandasquirt-v4/can_protocol.{h,cpp} tests/
 git commit -m "feat: Frame 1 packing with tests"
 ```
 
@@ -1227,8 +1227,8 @@ git commit -m "feat: Frame 1 packing with tests"
 ### Task 12: Frame 2 byte packing + tests
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.h`
-- Modify: `carduino-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/can_protocol.h`
+- Modify: `expandasquirt-v4/can_protocol.cpp`
 - Modify: `tests/test_can_protocol.cpp`
 
 - [ ] **Step 1: Write tests FIRST**
@@ -1288,7 +1288,7 @@ void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, ui
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/can_protocol.{h,cpp} tests/test_can_protocol.cpp
+git add expandasquirt-v4/can_protocol.{h,cpp} tests/test_can_protocol.cpp
 git commit -m "feat: Frame 2 packing with tests"
 ```
 
@@ -1297,8 +1297,8 @@ git commit -m "feat: Frame 2 packing with tests"
 ### Task 13: CanSendPhase — broadcast both frames at 10 Hz
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Implement `CanSendPhase()` inside the `#ifdef ARDUINO` block**
 
@@ -1328,7 +1328,7 @@ void CanSendPhase() {
 }
 ```
 
-- [ ] **Step 2: Wire into `carduino-v4.ino`**
+- [ ] **Step 2: Wire into `expandasquirt-v4.ino`**
 
 Replace the `// CanSendPhase() — Task 13` placeholder with:
 ```c
@@ -1338,13 +1338,13 @@ CanSendPhase();
 - [ ] **Step 3: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 - [ ] **Step 4: 🔧 Bench-verify with USB-CAN dongle**
 
 Wire up:
-- Carduino with MCP2515 shield, USB power
+- Expandasquirt with MCP2515 shield, USB power
 - USB-CAN dongle (CANable v2 or similar) connected to MCP2515 CAN_H/CAN_L lines (with 120Ω termination)
 - USB-CAN dongle plugged into laptop running `candump`, `SocketCAN`, or vendor utility (e.g., `SavvyCAN`)
 
@@ -1360,7 +1360,7 @@ If frames don't appear, check: shield wiring, CAN_H/CAN_L not swapped, 120Ω ter
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: CanSendPhase broadcasts Frames 1 and 2 at 10 Hz"
 ```
 
@@ -1374,9 +1374,9 @@ git commit -m "feat: CanSendPhase broadcasts Frames 1 and 2 at 10 Hz"
 > - **DEFERRED-TO-TASK-18** — `mcp2515.sendMessage()` return values are currently ignored in `CanSendPhase`. Track tx errors and surface into a CAN health/error counter as part of the health bitmask Phase D introduces.
 
 **Files:**
-- Create: `carduino-v4/self_tests.h`
-- Create: `carduino-v4/self_tests.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Create: `expandasquirt-v4/self_tests.h`
+- Create: `expandasquirt-v4/self_tests.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Create `self_tests.h`**
 
@@ -1443,7 +1443,7 @@ bool self_test_can_available() {
 }
 ```
 
-- [ ] **Step 3: Wire into `carduino-v4.ino`**
+- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
 
 Replace the existing `if (!can_protocol_init()) {...}` block with:
 ```c
@@ -1461,7 +1461,7 @@ Same setup as Task 13. Expected: CAN frames continue normally; serial shows `MCP
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/self_tests.{h,cpp} carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/self_tests.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "feat: boot self-test orchestration"
 ```
 
@@ -1475,8 +1475,8 @@ git commit -m "feat: boot self-test orchestration"
 > - **HIGH** — `sensor_health.h` MUST wrap function declarations in the `#ifdef __cplusplus / extern "C" { ... } / #endif` guard pattern, identical to `sensor_pipeline.h` and `can_protocol.h`. Without it, host tests declare `electrical_fault()` inside their own `extern "C"` block but the C++-mangled implementation symbol won't match → linker fails. (Same defect that bit Task 5; convention is established.)
 
 **Files:**
-- Create: `carduino-v4/sensor_health.h`
-- Create: `carduino-v4/sensor_health.cpp`
+- Create: `expandasquirt-v4/sensor_health.h`
+- Create: `expandasquirt-v4/sensor_health.cpp`
 - Create: `tests/test_sensor_health.cpp`
 - Modify: `tests/test_main.cpp` and `tests/run-tests.sh`
 
@@ -1516,7 +1516,7 @@ TEST_CASE(electrical_fault_in_normal_range) {
 
 - [ ] **Step 2: Create header**
 
-`carduino-v4/sensor_health.h`:
+`expandasquirt-v4/sensor_health.h`:
 ```c
 #ifndef SENSOR_HEALTH_H
 #define SENSOR_HEALTH_H
@@ -1534,7 +1534,7 @@ bool electrical_fault(int adc_raw);
 
 - [ ] **Step 4: Implement**
 
-`carduino-v4/sensor_health.cpp`:
+`expandasquirt-v4/sensor_health.cpp`:
 ```c
 #include "sensor_health.h"
 
@@ -1550,14 +1550,14 @@ bool electrical_fault(int adc_raw) {
 
 Add `#include "test_sensor_health.cpp"` to `test_main.cpp`.
 
-Add `../carduino-v4/sensor_health.cpp` to `run-tests.sh` g++ command.
+Add `../expandasquirt-v4/sensor_health.cpp` to `run-tests.sh` g++ command.
 
 - [ ] **Step 6: Run tests, verify PASS**
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add carduino-v4/sensor_health.{h,cpp} tests/
+git add expandasquirt-v4/sensor_health.{h,cpp} tests/
 git commit -m "feat: electrical fault detection"
 ```
 
@@ -1572,8 +1572,8 @@ git commit -m "feat: electrical fault detection"
 
 
 **Files:**
-- Modify: `carduino-v4/sensor_health.h`
-- Modify: `carduino-v4/sensor_health.cpp`
+- Modify: `expandasquirt-v4/sensor_health.h`
+- Modify: `expandasquirt-v4/sensor_health.cpp`
 - Modify: `tests/test_sensor_health.cpp`
 
 - [ ] **Step 1: Write tests FIRST**
@@ -1673,7 +1673,7 @@ bool debounce_update(DebounceState* d, bool sample_bad) {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/sensor_health.{h,cpp} tests/test_sensor_health.cpp
+git add expandasquirt-v4/sensor_health.{h,cpp} tests/test_sensor_health.cpp
 git commit -m "feat: debounce state machine"
 ```
 
@@ -1686,8 +1686,8 @@ git commit -m "feat: debounce state machine"
 
 
 **Files:**
-- Modify: `carduino-v4/sensor_health.h`
-- Modify: `carduino-v4/sensor_health.cpp`
+- Modify: `expandasquirt-v4/sensor_health.h`
+- Modify: `expandasquirt-v4/sensor_health.cpp`
 - Modify: `tests/test_sensor_health.cpp`
 
 - [ ] **Step 1: Write tests**
@@ -1742,7 +1742,7 @@ bool plausibility_kpa(float v)          { return v >= 0.0f   && v <= 200.0f; }
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/sensor_health.{h,cpp} tests/test_sensor_health.cpp
+git add expandasquirt-v4/sensor_health.{h,cpp} tests/test_sensor_health.cpp
 git commit -m "feat: plausibility checks for sensor values"
 ```
 
@@ -1759,9 +1759,9 @@ git commit -m "feat: plausibility checks for sensor values"
 
 
 **Files:**
-- Modify: `carduino-v4/sensor_health.h`
-- Modify: `carduino-v4/sensor_health.cpp`
-- Modify: `carduino-v4/sensor_pipeline.cpp`
+- Modify: `expandasquirt-v4/sensor_health.h`
+- Modify: `expandasquirt-v4/sensor_health.cpp`
+- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
 
 - [ ] **Step 1: Add per-sensor health tracking to `sensor_health.h`**
 
@@ -1883,7 +1883,7 @@ Use USB-CAN dongle to capture and verify.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: per-sensor health bitmask in CAN frame"
 ```
 
@@ -1900,9 +1900,9 @@ git commit -m "feat: per-sensor health bitmask in CAN frame"
 
 
 **Files:**
-- Modify: `carduino-v4/sensor_health.h`
-- Modify: `carduino-v4/sensor_health.cpp`
-- Modify: `carduino-v4/sensor_pipeline.cpp`
+- Modify: `expandasquirt-v4/sensor_health.h`
+- Modify: `expandasquirt-v4/sensor_health.cpp`
+- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
 - Modify: `tests/test_sensor_health.cpp`
 
 - [ ] **Step 1: Write tests**
@@ -2065,13 +2065,13 @@ if (channel_health_update(&h_oil_temp, ..., &flat_oil_temp, now, eng))   mask |=
 
 ```bash
 ./tests/run-tests.sh
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add carduino-v4/ tests/
+git add expandasquirt-v4/ tests/
 git commit -m "feat: flatline detection with engine-running gate"
 ```
 
@@ -2082,9 +2082,9 @@ git commit -m "feat: flatline detection with engine-running gate"
 ### Task 20: Arduino_LED_Matrix init + boot animation
 
 **Files:**
-- Create: `carduino-v4/display_matrix.h`
-- Create: `carduino-v4/display_matrix.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Create: `expandasquirt-v4/display_matrix.h`
+- Create: `expandasquirt-v4/display_matrix.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Create header**
 
@@ -2158,7 +2158,7 @@ void DisplayUpdate() {
 }
 ```
 
-- [ ] **Step 3: Wire into `carduino-v4.ino`**
+- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
 
 Add `#include "display_matrix.h"`.
 
@@ -2182,7 +2182,7 @@ Compile and flash. Expected: boot animation visible on LED matrix during boot, t
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/display_matrix.{h,cpp} carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/display_matrix.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "feat: LED matrix init + boot animation"
 ```
 
@@ -2191,7 +2191,7 @@ git commit -m "feat: LED matrix init + boot animation"
 ### Task 21: Normal-mode display (heartbeat + sensor health LEDs)
 
 **Files:**
-- Modify: `carduino-v4/display_matrix.cpp`
+- Modify: `expandasquirt-v4/display_matrix.cpp`
 
 - [ ] **Step 1: Implement `DISP_NORMAL`**
 
@@ -2238,7 +2238,7 @@ Flash. Expected:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add carduino-v4/display_matrix.cpp
+git add expandasquirt-v4/display_matrix.cpp
 git commit -m "feat: normal-mode display with heartbeat and health LEDs"
 ```
 
@@ -2247,8 +2247,8 @@ git commit -m "feat: normal-mode display with heartbeat and health LEDs"
 ### Task 22: Error display (ERR##)
 
 **Files:**
-- Modify: `carduino-v4/display_matrix.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/display_matrix.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Add 5×7 digit font in `display_matrix.cpp`**
 
@@ -2296,7 +2296,7 @@ Add to switch in `DisplayUpdate`:
 case DISP_ERROR: draw_error(); break;
 ```
 
-- [ ] **Step 2: Wire ERR codes into `carduino-v4.ino`**
+- [ ] **Step 2: Wire ERR codes into `expandasquirt-v4.ino`**
 
 After `run_boot_self_tests()`:
 ```c
@@ -2322,7 +2322,7 @@ Reconnect shield, power-cycle. Expected: normal display.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: error code display on LED matrix"
 ```
 
@@ -2331,7 +2331,7 @@ git commit -m "feat: error code display on LED matrix"
 ### Task 23: Display state machine integration
 
 **Files:**
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Verify the display update is being called from main loop** (already done in Task 20)
 
@@ -2341,7 +2341,7 @@ Confirm `DisplayUpdate()` is in the `loop()` dispatcher with correct cadence (10
 
 Verify these transitions exist in code:
 - DISP_BOOT in `setup()` before self-tests
-- DISP_NORMAL after self-tests pass (in `carduino-v4.ino`)
+- DISP_NORMAL after self-tests pass (in `expandasquirt-v4.ino`)
 - DISP_ERROR via `display_set_error()` on self-test failures
 
 If any missing, add them now. The boot → normal transition can be moved to right after `run_boot_self_tests()` returns clean.
@@ -2356,7 +2356,7 @@ Flash and power up. Expected:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "chore: confirm display state transitions wired correctly"
 ```
 
@@ -2367,9 +2367,9 @@ git commit -m "chore: confirm display state transitions wired correctly"
 ### Task 24: ArduinoBLE NUS service init + advertising
 
 **Files:**
-- Create: `carduino-v4/ble_console.h`
-- Create: `carduino-v4/ble_console.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Create: `expandasquirt-v4/ble_console.h`
+- Create: `expandasquirt-v4/ble_console.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Create `ble_console.h`**
 
@@ -2450,7 +2450,7 @@ void BleDumpPhase() {
 }
 ```
 
-- [ ] **Step 3: Wire into `carduino-v4.ino`**
+- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
 
 Add `#include "ble_console.h"`.
 
@@ -2466,7 +2466,7 @@ Replace `// BleServicePhase() — Task 24` with `BleServicePhase();`.
 
 - [ ] **Step 4: 🔧 Bench-verify**
 
-Flash. Open `Serial Bluetooth Terminal` (Android) or `nRF Connect` (any platform). Scan for `CARDUINO-v4`.
+Flash. Open `Serial Bluetooth Terminal` (Android) or `nRF Connect` (any platform). Scan for `EXPANDASQUIRT-v4`.
 
 Expected:
 - Device visible in scan results
@@ -2477,7 +2477,7 @@ Expected:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/ble_console.{h,cpp} carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/ble_console.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "feat: BLE NUS peripheral advertising"
 ```
 
@@ -2486,8 +2486,8 @@ git commit -m "feat: BLE NUS peripheral advertising"
 ### Task 25: Command parser with newline framing
 
 **Files:**
-- Modify: `carduino-v4/ble_console.h`
-- Modify: `carduino-v4/ble_console.cpp`
+- Modify: `expandasquirt-v4/ble_console.h`
+- Modify: `expandasquirt-v4/ble_console.cpp`
 
 - [ ] **Step 1: Add command callback infrastructure**
 
@@ -2574,12 +2574,12 @@ void BleServicePhase() {
 
 Compile & flash. Connect via phone app. Type "garbage\n" in the app.
 
-Expected response from Carduino: `unknown command - type 'help'\r\n`.
+Expected response from Expandasquirt: `unknown command - type 'help'\r\n`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/ble_console.{h,cpp}
+git add expandasquirt-v4/ble_console.{h,cpp}
 git commit -m "feat: BLE command parser with newline framing"
 ```
 
@@ -2588,8 +2588,8 @@ git commit -m "feat: BLE command parser with newline framing"
 ### Task 26: BleDumpPhase + status command
 
 **Files:**
-- Modify: `carduino-v4/ble_console.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/ble_console.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Implement `BleDumpPhase()`**
 
@@ -2644,7 +2644,7 @@ ble_register_command("status", cmd_status);
 
 - [ ] **Step 3: Wire `BleDumpPhase()` into main loop**
 
-Replace `// BleDumpPhase() — Task 26` in `carduino-v4.ino` with `BleDumpPhase();`.
+Replace `// BleDumpPhase() — Task 26` in `expandasquirt-v4.ino` with `BleDumpPhase();`.
 
 - [ ] **Step 4: 🔧 Bench-verify**
 
@@ -2653,7 +2653,7 @@ Connect via phone, observe periodic dumps every 200 ms. Type `status`, expect on
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: BLE periodic dump + status command"
 ```
 
@@ -2662,7 +2662,7 @@ git commit -m "feat: BLE periodic dump + status command"
 ### Task 27: Calibration commands
 
 **Files:**
-- Modify: `carduino-v4/ble_console.cpp`
+- Modify: `expandasquirt-v4/ble_console.cpp`
 
 - [ ] **Step 1: Add raw ADC + voltage helper + cal commands**
 
@@ -2699,7 +2699,7 @@ Connect via phone, type `cal pres1`. Expect raw ADC + voltage values.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add carduino-v4/ble_console.cpp
+git add expandasquirt-v4/ble_console.cpp
 git commit -m "feat: BLE cal command for raw ADC inspection"
 ```
 
@@ -2708,7 +2708,7 @@ git commit -m "feat: BLE cal command for raw ADC inspection"
 ### Task 28: Reboot, reset, clear-errors, help commands
 
 **Files:**
-- Modify: `carduino-v4/ble_console.cpp`
+- Modify: `expandasquirt-v4/ble_console.cpp`
 
 - [ ] **Step 1: Implement remaining commands**
 
@@ -2746,12 +2746,12 @@ ble_register_command("help",   cmd_help);
 
 - [ ] **Step 2: 🔧 Bench-verify**
 
-Connect, type `help`. Expect command list. Type `reboot`. Expect Carduino to reboot (LED matrix shows boot animation again).
+Connect, type `help`. Expect command list. Type `reboot`. Expect Expandasquirt to reboot (LED matrix shows boot animation again).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add carduino-v4/ble_console.cpp
+git add expandasquirt-v4/ble_console.cpp
 git commit -m "feat: BLE reboot and help commands"
 ```
 
@@ -2760,7 +2760,7 @@ git commit -m "feat: BLE reboot and help commands"
 ### Task 29: Connect-time banner
 
 **Files:**
-- Modify: `carduino-v4/ble_console.cpp`
+- Modify: `expandasquirt-v4/ble_console.cpp`
 
 - [ ] **Step 1: Detect connection events and send banner**
 
@@ -2776,7 +2776,7 @@ void BleServicePhase() {
     if (now_connected && !was_connected) {
         // Just connected — send banner
         char buf[64];
-        snprintf(buf, sizeof(buf), "CARDUINO v4 connected (uptime %lu sec)", millis() / 1000);
+        snprintf(buf, sizeof(buf), "EXPANDASQUIRT v4 connected (uptime %lu sec)", millis() / 1000);
         ble_println(buf);
         ble_println("type 'help' for commands");
     }
@@ -2793,7 +2793,7 @@ Disconnect/reconnect via phone. Expect banner on each connect.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add carduino-v4/ble_console.cpp
+git add expandasquirt-v4/ble_console.cpp
 git commit -m "feat: BLE connect-time banner"
 ```
 
@@ -2804,8 +2804,8 @@ git commit -m "feat: BLE connect-time banner"
 ### Task 30: Persistent state struct + flash read/write
 
 **Files:**
-- Create: `carduino-v4/persistent.h`
-- Create: `carduino-v4/persistent.cpp`
+- Create: `expandasquirt-v4/persistent.h`
+- Create: `expandasquirt-v4/persistent.cpp`
 
 - [ ] **Step 1: Research the R4 data flash API**
 
@@ -2905,13 +2905,13 @@ void persistent_record_boot(ResetCause cause) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/persistent.{h,cpp}
+git add expandasquirt-v4/persistent.{h,cpp}
 git commit -m "feat: persistent state via EEPROM library"
 ```
 
@@ -2920,9 +2920,9 @@ git commit -m "feat: persistent state via EEPROM library"
 ### Task 31: Reset cause detection + boot command
 
 **Files:**
-- Modify: `carduino-v4/persistent.cpp` (add reset cause detection)
-- Modify: `carduino-v4/ble_console.cpp` (add `boot` command)
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/persistent.cpp` (add reset cause detection)
+- Modify: `expandasquirt-v4/ble_console.cpp` (add `boot` command)
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Detect reset cause via Renesas RSTSR registers**
 
@@ -2956,7 +2956,7 @@ Implementation note: the original plan content's masks for brownout, watchdog, a
 
 - [ ] **Step 2: Wire reset cause into `setup()`**
 
-In `carduino-v4.ino`, before `run_boot_self_tests()`:
+In `expandasquirt-v4.ino`, before `run_boot_self_tests()`:
 ```c
 persistent_init();
 ResetCause cause = read_reset_cause();
@@ -2998,7 +2998,7 @@ Type `reboot`, reconnect, type `boot`. Expect `reset=SOFT_RESET`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: reset cause detection + boot command"
 ```
 
@@ -3007,7 +3007,7 @@ git commit -m "feat: reset cause detection + boot command"
 ### Task 32: Watchdog enable + feed
 
 **Files:**
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Research IWDT API on RA4M1**
 
@@ -3021,7 +3021,7 @@ If FSP integration is complex, a fallback: implement a software watchdog using `
 
 - [ ] **Step 2: Implement software watchdog (simpler fallback)**
 
-In `carduino-v4.ino`:
+In `expandasquirt-v4.ino`:
 
 ```c
 static unsigned long last_loop_ms = 0;
@@ -3049,14 +3049,14 @@ Add a test branch in `loop()` (commented out for now):
 // if (digitalRead(7) == LOW) { delay(2000); }  // simulate hang
 ```
 
-Wire pin D7 to GND momentarily; expect Carduino to reset within 1 second. Persistent state shows `reset=SOFT_RESET` (since `NVIC_SystemReset` looks like a soft reset to RSTSR1).
+Wire pin D7 to GND momentarily; expect Expandasquirt to reset within 1 second. Persistent state shows `reset=SOFT_RESET` (since `NVIC_SystemReset` looks like a soft reset to RSTSR1).
 
 Comment out / remove the test code after verification.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "feat: software watchdog with auto-reset"
 ```
 
@@ -3065,8 +3065,8 @@ git commit -m "feat: software watchdog with auto-reset"
 ### Task 33: System status flags wired into Frame 2
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.cpp`
-- Modify: `carduino-v4/ble_console.cpp` (provide ble_client_connected for status)
+- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/ble_console.cpp` (provide ble_client_connected for status)
 
 - [ ] **Step 1: Compose status flags byte from system state**
 
@@ -3118,7 +3118,7 @@ USB-CAN dongle. With BLE phone connected, Frame 2 byte 6 should be `0x09` (ready
 - [ ] **Step 3: Commit**
 
 ```bash
-git add carduino-v4/can_protocol.cpp
+git add expandasquirt-v4/can_protocol.cpp
 git commit -m "feat: status flags in Frame 2 reflect system state"
 ```
 
@@ -3127,9 +3127,9 @@ git commit -m "feat: status flags in Frame 2 reflect system state"
 ### Task 34: System health monitoring (CAN errors, loop timing)
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.h`
-- Modify: `carduino-v4/can_protocol.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/can_protocol.h`
+- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Track CAN errors and loop timing**
 
@@ -3174,7 +3174,7 @@ if (gSystemHealth.can_busoff_active)   flags |= 0x80;  // bit 7
 // bit 6: loop timing — see below
 ```
 
-- [ ] **Step 2: Track loop timing in `carduino-v4.ino`**
+- [ ] **Step 2: Track loop timing in `expandasquirt-v4.ino`**
 
 ```c
 static unsigned long loop_timing_warn_until = 0;
@@ -3226,7 +3226,7 @@ Reconnect; verify recovery.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: system health flags (CAN errors, loop timing, flatline)"
 ```
 
@@ -3237,7 +3237,7 @@ git commit -m "feat: system health flags (CAN errors, loop timing, flatline)"
 ### Task 35: MCP2515 RX filter for ID 1512
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/can_protocol.cpp`
 
 - [ ] **Step 1: Configure hardware filter to admit only ID 1512**
 
@@ -3256,16 +3256,16 @@ mcp2515.setFilter(MCP2515::RXF2, false, CAN_RX_RPM_ID);
 - [ ] **Step 2: Compile and 🔧 bench-verify**
 
 USB-CAN dongle: inject frames with various IDs. Expected behavior:
-- Frame ID 1024 (wideband): not received by Carduino
+- Frame ID 1024 (wideband): not received by Expandasquirt
 - Frame ID 1512: received
-- Frame ID 1025/1026 (our own TX): not received by Carduino (we don't see our own broadcasts)
+- Frame ID 1025/1026 (our own TX): not received by Expandasquirt (we don't see our own broadcasts)
 
 Verify by adding a temporary `Serial.println("got 1512")` in CanReceivePhase (next task) and watching what comes through.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add carduino-v4/can_protocol.cpp
+git add expandasquirt-v4/can_protocol.cpp
 git commit -m "feat: MCP2515 RX filter for MS3 dash broadcast"
 ```
 
@@ -3274,10 +3274,10 @@ git commit -m "feat: MCP2515 RX filter for MS3 dash broadcast"
 ### Task 36: RPM parse + engine-running gate
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.h`
-- Modify: `carduino-v4/can_protocol.cpp`
-- Modify: `carduino-v4/sensor_pipeline.cpp`
-- Modify: `carduino-v4/carduino-v4.ino`
+- Modify: `expandasquirt-v4/can_protocol.h`
+- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
 
 - [ ] **Step 1: Add `CanReceivePhase()` and RPM accessor**
 
@@ -3328,7 +3328,7 @@ static bool engine_running_now() {
 
 - [ ] **Step 3: Wire `CanReceivePhase()` into main loop**
 
-In `carduino-v4.ino`, replace `// CanReceivePhase() — Task 36` with:
+In `expandasquirt-v4.ino`, replace `// CanReceivePhase() — Task 36` with:
 ```c
 CanReceivePhase();
 ```
@@ -3342,7 +3342,7 @@ Add temporary debug to BLE: type `status` and verify the `health` reflects engin
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: CAN RX of MS3 RPM broadcast for engine-running gate"
 ```
 
@@ -3356,7 +3356,7 @@ git commit -m "feat: CAN RX of MS3 RPM broadcast for engine-running gate"
 - [ ] **Step 1: 🔧 Bench-verify flatline behavior**
 
 Setup:
-- Carduino with CAN connected
+- Expandasquirt with CAN connected
 - USB-CAN dongle injecting RPM frames at 2000 RPM (sent every 100 ms)
 - Pot on A0 set to a fixed value
 
@@ -3495,7 +3495,7 @@ void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 3000);
 
-    if (WiFi.beginAP("CARDUINO-OTA-TEST", AP_PASSWORD) != WL_AP_LISTENING) {
+    if (WiFi.beginAP("EXPANDASQUIRT-OTA-TEST", AP_PASSWORD) != WL_AP_LISTENING) {
         Serial.println("AP start failed");
         while (1);
     }
@@ -3506,7 +3506,7 @@ void setup() {
 
 static const char* PAGE =
     "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
-    "<html><body><h1>CARDUINO Test</h1>"
+    "<html><body><h1>EXPANDASQUIRT Test</h1>"
     "<form method='POST' action='/upload' enctype='multipart/form-data'>"
     "<input type='file' name='f'><input type='submit'>"
     "</form></body></html>";
@@ -3543,7 +3543,7 @@ void loop() {
 
 - [ ] **Step 2: 🔧 Bench-verify**
 
-Flash. Phone connects to `CARDUINO-OTA-TEST` AP. Browser to `http://192.168.4.1`. Upload a small file. Expect:
+Flash. Phone connects to `EXPANDASQUIRT-OTA-TEST` AP. Browser to `http://192.168.4.1`. Upload a small file. Expect:
 - Page loads
 - File upload succeeds
 - Serial shows correct byte count
@@ -3621,9 +3621,9 @@ See `V4X-DESIGN.md` (especially §3.2, §4.4, §11.2) for the design rationale. 
 ### Task 41: Maintenance mode entry/exit state machine
 
 **Files:**
-- Create: `carduino-v4/maintenance_mode.h`
-- Create: `carduino-v4/maintenance_mode.cpp`
-- Modify: `carduino-v4/ble_console.cpp` (add maintenance/abort commands)
+- Create: `expandasquirt-v4/maintenance_mode.h`
+- Create: `expandasquirt-v4/maintenance_mode.cpp`
+- Modify: `expandasquirt-v4/ble_console.cpp` (add maintenance/abort commands)
 
 - [ ] **Step 1: Create header**
 
@@ -3720,7 +3720,7 @@ ble_register_command("abort", cmd_abort);
 
 - [ ] **Step 4: Wire into main loop**
 
-In `carduino-v4.ino`:
+In `expandasquirt-v4.ino`:
 
 Replace `// HttpServerServicePhase() — Task 42` (was placeholder) and the `if (maintenanceModeActive)` block with:
 ```c
@@ -3737,7 +3737,7 @@ Connect via BLE. Type `maintenance`. Expect: 3-sec countdown message, LED matrix
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: maintenance mode state machine + entry/abort"
 ```
 
@@ -3746,8 +3746,8 @@ git commit -m "feat: maintenance mode state machine + entry/abort"
 ### Task 42: AP mode + minimal HTTP server in maintenance mode
 
 **Files:**
-- Modify: `carduino-v4/maintenance_mode.cpp`
-- Modify: `carduino-v4/display_matrix.cpp` (add DISP_AP_READY rendering)
+- Modify: `expandasquirt-v4/maintenance_mode.cpp`
+- Modify: `expandasquirt-v4/display_matrix.cpp` (add DISP_AP_READY rendering)
 
 - [ ] **Step 1: Bring up AP and serve the upload page**
 
@@ -3760,8 +3760,8 @@ git commit -m "feat: maintenance mode state machine + entry/abort"
 static WiFiServer http_server(80);
 static const char UPLOAD_PAGE[] PROGMEM =
     "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
-    "<!DOCTYPE html><html><head><title>CARDUINO OTA</title></head><body>"
-    "<h1>CARDUINO v4</h1>"
+    "<!DOCTYPE html><html><head><title>EXPANDASQUIRT OTA</title></head><body>"
+    "<h1>EXPANDASQUIRT v4</h1>"
     "<form method='POST' action='/upload' enctype='multipart/form-data'>"
     "<input type='file' name='firmware' accept='.bin'><br><br>"
     "<input type='submit' value='Upload'>"
@@ -3829,12 +3829,12 @@ case DISP_AP_READY: draw_ap_ready(); break;
 
 - [ ] **Step 3: 🔧 Bench-verify**
 
-Trigger maintenance mode. Phone connects to `CARDUINO-OTA` AP. Browser to `http://192.168.4.1`. Expect upload form to load.
+Trigger maintenance mode. Phone connects to `EXPANDASQUIRT-OTA` AP. Browser to `http://192.168.4.1`. Expect upload form to load.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: AP mode + upload page in maintenance"
 ```
 
@@ -3843,8 +3843,8 @@ git commit -m "feat: AP mode + upload page in maintenance"
 ### Task 43: HTTP file upload + LED matrix progress
 
 **Files:**
-- Modify: `carduino-v4/maintenance_mode.cpp`
-- Modify: `carduino-v4/display_matrix.cpp`
+- Modify: `expandasquirt-v4/maintenance_mode.cpp`
+- Modify: `expandasquirt-v4/display_matrix.cpp`
 
 ⚠️ The exact integration here depends entirely on Task 38/40 findings. If `OTAUpdate::update(file_path)` works after staging a local file, this task implements that path. If only `download(url, path)` works, this task instead saves the upload to flash and serves it from a localhost-style endpoint. Implementation details below assume **Path α** worked — adapt as needed.
 
@@ -3912,7 +3912,7 @@ Trigger maintenance mode, upload a file via browser. Expect:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: HTTP upload streaming + LED progress bar"
 ```
 
@@ -3921,8 +3921,8 @@ git commit -m "feat: HTTP upload streaming + LED progress bar"
 ### Task 44: Apply OTA + reboot
 
 **Files:**
-- Modify: `carduino-v4/maintenance_mode.cpp`
-- Modify: `carduino-v4/display_matrix.cpp`
+- Modify: `expandasquirt-v4/maintenance_mode.cpp`
+- Modify: `expandasquirt-v4/display_matrix.cpp`
 
 - [ ] **Step 1: Implement MM_APPLYING state**
 
@@ -3976,7 +3976,7 @@ If apply fails, ERR99 displayed.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/
+git add expandasquirt-v4/
 git commit -m "feat: OTA apply + reboot completion"
 ```
 
@@ -3992,7 +3992,7 @@ git commit -m "feat: OTA apply + reboot completion"
 - [ ] **Step 1: Document all wiring**
 
 ```markdown
-# CARDUINO v4 Wiring
+# EXPANDASQUIRT v4 Wiring
 
 ## Power
 - 12V switched → buck-boost (B07WY4P7W8) → 1A polyfuse → R4 VIN
@@ -4045,7 +4045,7 @@ git commit -m "docs: wiring diagram and sensor pinout"
 - [ ] **Step 1: Document the TS configuration steps**
 
 ```markdown
-# TunerStudio Setup for CARDUINO v4
+# TunerStudio Setup for EXPANDASQUIRT v4
 
 ## Prerequisites
 - TunerStudio version 3.x or newer
@@ -4116,9 +4116,9 @@ git commit -m "docs: bench test procedures"
 - [ ] **Step 1: Replace skeleton with full README**
 
 ```markdown
-# CARDUINO v4
+# EXPANDASQUIRT v4
 
-CARDUINO v4 is a sensor adapter for an MS3Pro PNP on a 2000 NB1 Miata. It reads
+EXPANDASQUIRT v4 is a sensor adapter for an MS3Pro PNP on a 2000 NB1 Miata. It reads
 five aftermarket analog sensors on an Uno R4 WiFi-class board, converts them to
 engineering units, and broadcasts them to MS3 over CAN at 10 Hz.
 
@@ -4132,12 +4132,12 @@ See `DESIGN.md` for the full spec, `IMPLEMENTATION-PLAN.md` for the build plan.
 
 ## Build
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 ## Flash (USB)
 ```bash
-arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> carduino-v4/
+arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/
 ```
 
 Wireless firmware updates are deferred to v4.x; see `DESIGN.md` section 6.4.3.
@@ -4204,7 +4204,7 @@ git commit -m "test: Phase 1 bench validation complete"
 
 - [ ] **Step 1: Physical install per `docs/wiring-diagram.md`**
 
-- Mount Carduino + buck-boost in cabin / under-dash
+- Mount Expandasquirt + buck-boost in cabin / under-dash
 - Run sensor wires through firewall to engine bay
 - Mount and connect each sensor per design §1.3
 
@@ -4322,7 +4322,7 @@ void setup() {
   Serial.println();
   Serial.print("IP: "); Serial.println(WiFi.localIP());
 
-  ArduinoOTA.begin(WiFi.localIP(), "carduino-v4-proto", "testpw", InternalStorage);
+  ArduinoOTA.begin(WiFi.localIP(), "expandasquirt-v4-proto", "testpw", InternalStorage);
   Serial.println("ArduinoOTA listening on port 65280");
 }
 
@@ -4399,7 +4399,7 @@ avahi-browse -r _arduino._tcp
 dns-sd -B _arduino._tcp local.   # if available; else use a phone with NsdManager test app
 ```
 
-Expected: `carduino-v4-proto` appears in service browse results within ~5 sec, with the device's IP and port 65280. **This proves mDNS responder works on R4.**
+Expected: `expandasquirt-v4-proto` appears in service browse results within ~5 sec, with the device's IP and port 65280. **This proves mDNS responder works on R4.**
 
 - [ ] **Step 9: Document results in `prototypes/ota_arduinoota/README.md`**
 
@@ -4465,7 +4465,7 @@ Add to `app/src/main/AndroidManifest.xml`:
 - [ ] **Step 2: Write `MainActivity.kt` — start LOH, POST to a test target**
 
 ```kotlin
-package works.mees.carduino.protoloh
+package works.mees.expandasquirt.protoloh
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -4682,7 +4682,7 @@ Add to the libraries section:
 - [ ] **Step 3: Verify clean compile**
 
 ```bash
-"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 Expected: existing build still passes (the include hasn't been added to the sketch yet, this is just confirming library install didn't break anything).
@@ -4699,10 +4699,10 @@ git commit -m "build: pin JAndrassy/ArduinoOTA library for v4.x"
 ### Task 57: 🧪 Percent-decode helper + RX buffer enlargement
 
 **Files:**
-- Modify: `carduino-v4/ble_console.h` (raise `BLE_RX_BUFFER_SIZE`)
-- Modify: `carduino-v4/ble_console.cpp` (apply new size)
-- Create: `carduino-v4/util/pct_decode.h`
-- Create: `carduino-v4/util/pct_decode.cpp`
+- Modify: `expandasquirt-v4/ble_console.h` (raise `BLE_RX_BUFFER_SIZE`)
+- Modify: `expandasquirt-v4/ble_console.cpp` (apply new size)
+- Create: `expandasquirt-v4/util/pct_decode.h`
+- Create: `expandasquirt-v4/util/pct_decode.cpp`
 - Create: `tests/test_pct_decode.cpp`
 - Modify: `tests/run-tests.sh` (add new test)
 
@@ -4710,7 +4710,7 @@ git commit -m "build: pin JAndrassy/ArduinoOTA library for v4.x"
 
 ```cpp
 // tests/test_pct_decode.cpp
-#include "../carduino-v4/util/pct_decode.h"
+#include "../expandasquirt-v4/util/pct_decode.h"
 #include <cassert>
 #include <cstring>
 
@@ -4754,7 +4754,7 @@ Expected: linker error, `pct_decode` undefined.
 - [ ] **Step 3: Implement helper**
 
 ```cpp
-// carduino-v4/util/pct_decode.h
+// expandasquirt-v4/util/pct_decode.h
 #pragma once
 #include <stddef.h>
 
@@ -4762,7 +4762,7 @@ bool pct_decode(const char* in, char* out, size_t out_capacity, size_t* out_len)
 ```
 
 ```cpp
-// carduino-v4/util/pct_decode.cpp
+// expandasquirt-v4/util/pct_decode.cpp
 #include "pct_decode.h"
 
 static int hex_nibble(char c) {
@@ -4797,7 +4797,7 @@ In `tests/run-tests.sh`, append:
 ```bash
 g++ -std=c++17 -o tests/test_pct_decode \
     tests/test_pct_decode.cpp \
-    carduino-v4/util/pct_decode.cpp
+    expandasquirt-v4/util/pct_decode.cpp
 ./tests/test_pct_decode && echo "[PASS] pct_decode"
 ```
 
@@ -4825,14 +4825,14 @@ Comment-block the rationale:
 - [ ] **Step 7: Verify firmware compile**
 
 ```bash
-"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 Expected: clean compile. Note the new RAM/flash usage.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add carduino-v4/util/ carduino-v4/ble_console.h tests/test_pct_decode.cpp tests/run-tests.sh
+git add expandasquirt-v4/util/ expandasquirt-v4/ble_console.h tests/test_pct_decode.cpp tests/run-tests.sh
 git commit -m "feat: percent-decode helper + 256B BLE RX buffer for maintenance command"
 ```
 
@@ -4841,15 +4841,15 @@ git commit -m "feat: percent-decode helper + 256B BLE RX buffer for maintenance 
 ### Task 58: New BLE commands — `maintenance ...` and `maintenance abort`
 
 **Files:**
-- Create: `carduino-v4/maintenance_mode.h`
-- Create: `carduino-v4/maintenance_mode.cpp` (skeleton — full state machine in Task 61)
-- Modify: `carduino-v4/ble_console.cpp` (parse + dispatch)
+- Create: `expandasquirt-v4/maintenance_mode.h`
+- Create: `expandasquirt-v4/maintenance_mode.cpp` (skeleton — full state machine in Task 61)
+- Modify: `expandasquirt-v4/ble_console.cpp` (parse + dispatch)
 - Create: `tests/test_maintenance_args.cpp` (parser tests)
 
 - [ ] **Step 1: Define `MaintenanceArgs` and request API**
 
 ```c
-// carduino-v4/maintenance_mode.h
+// expandasquirt-v4/maintenance_mode.h
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -4882,7 +4882,7 @@ bool maintenance_is_active();
 
 ```cpp
 // tests/test_maintenance_args.cpp
-#include "../carduino-v4/maintenance_mode.h"
+#include "../expandasquirt-v4/maintenance_mode.h"
 #include <cassert>
 #include <cstring>
 
@@ -5042,14 +5042,14 @@ if (strncmp(cmd, "maintenance ", 12) == 0) {
 
 ```bash
 "C:/Program Files/Git/bin/bash.exe" tests/run-tests.sh
-"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 Expected: all tests pass; firmware compiles. Sketch size grows by ~1-2 KB.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add carduino-v4/maintenance_mode.{h,cpp} carduino-v4/ble_console.cpp tests/test_maintenance_args.cpp tests/run-tests.sh
+git add expandasquirt-v4/maintenance_mode.{h,cpp} expandasquirt-v4/ble_console.cpp tests/test_maintenance_args.cpp tests/run-tests.sh
 git commit -m "feat: maintenance command parsing + BLE dispatch (state machine stubbed)"
 ```
 
@@ -5058,8 +5058,8 @@ git commit -m "feat: maintenance command parsing + BLE dispatch (state machine s
 ### Task 59: Banner version token
 
 **Files:**
-- Modify: `carduino-v4/config.h` (add `FIRMWARE_VERSION`, `FIRMWARE_BUILD`)
-- Modify: `carduino-v4/ble_console.cpp` (extend connect-time banner)
+- Modify: `expandasquirt-v4/config.h` (add `FIRMWARE_VERSION`, `FIRMWARE_BUILD`)
+- Modify: `expandasquirt-v4/ble_console.cpp` (extend connect-time banner)
 
 - [ ] **Step 1: Add version constants to config.h**
 
@@ -5078,7 +5078,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    carduino-v4/
+    expandasquirt-v4/
 ```
 
 Document this build invocation in `README.md` (section "Build with version stamp").
@@ -5096,7 +5096,7 @@ Document this build invocation in `README.md` (section "Build with version stamp
 In `ble_console.cpp`, locate the banner-on-connect routine (Task 29's code). Prepend a new first line:
 
 ```c
-ble_send_line("CARDUINO-v4 version=" FIRMWARE_VERSION " build=" FIRMWARE_BUILD);
+ble_send_line("EXPANDASQUIRT-v4 version=" FIRMWARE_VERSION " build=" FIRMWARE_BUILD);
 ```
 
 The existing reset/boot/last_err line stays as the second line.
@@ -5108,20 +5108,20 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    carduino-v4/
+    expandasquirt-v4/
 "C:/Program Files/Arduino CLI/arduino-cli.exe" upload \
-    --fqbn arduino:renesas_uno:unor4wifi --port COM8 carduino-v4/
+    --fqbn arduino:renesas_uno:unor4wifi --port COM8 expandasquirt-v4/
 ```
 
 Connect via `Serial Bluetooth Terminal`. First line on connect should be:
 ```
-CARDUINO-v4 version=4.1.0 build=4659186
+EXPANDASQUIRT-v4 version=4.1.0 build=4659186
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add carduino-v4/config.h carduino-v4/ble_console.cpp README.md
+git add expandasquirt-v4/config.h expandasquirt-v4/ble_console.cpp README.md
 git commit -m "feat: firmware version token in BLE connect banner"
 ```
 
@@ -5130,9 +5130,9 @@ git commit -m "feat: firmware version token in BLE connect banner"
 ### Task 60: Final CAN status frame on maintenance entry
 
 **Files:**
-- Modify: `carduino-v4/can_protocol.h` (expose a "send single frame with custom flags" helper if not present)
-- Modify: `carduino-v4/can_protocol.cpp`
-- Modify: `carduino-v4/maintenance_mode.cpp` (call from MM_ARMED entry)
+- Modify: `expandasquirt-v4/can_protocol.h` (expose a "send single frame with custom flags" helper if not present)
+- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `expandasquirt-v4/maintenance_mode.cpp` (call from MM_ARMED entry)
 
 - [ ] **Step 1: Add helper to set the OTA-in-progress bit and flush one CAN frame**
 
@@ -5174,7 +5174,7 @@ Flash. Trigger maintenance via BLE (`maintenance ssid=test psk=test pwd=test`). 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add carduino-v4/can_protocol.{h,cpp} carduino-v4/maintenance_mode.cpp
+git add expandasquirt-v4/can_protocol.{h,cpp} expandasquirt-v4/maintenance_mode.cpp
 git commit -m "feat: send final CAN status frame with OTA bit set on maintenance entry"
 ```
 
@@ -5183,9 +5183,9 @@ git commit -m "feat: send final CAN status frame with OTA bit set on maintenance
 ### Task 61: Maintenance state machine
 
 **Files:**
-- Modify: `carduino-v4/maintenance_mode.cpp` (real state machine, replacing stubs)
-- Modify: `carduino-v4/maintenance_mode.h` (state enum if exposed for tests)
-- Modify: `carduino-v4/carduino-v4.ino` (call `maintenance_tick(now)` each loop)
+- Modify: `expandasquirt-v4/maintenance_mode.cpp` (real state machine, replacing stubs)
+- Modify: `expandasquirt-v4/maintenance_mode.h` (state enum if exposed for tests)
+- Modify: `expandasquirt-v4/expandasquirt-v4.ino` (call `maintenance_tick(now)` each loop)
 
 - [ ] **Step 1: Define states**
 
@@ -5234,7 +5234,7 @@ static void transition_to(MMState s, uint32_t now) {
             WiFi.begin(s_args.ssid, s_args.psk);
             break;
         case MMState::OTA_READY:
-            ArduinoOTA.begin(WiFi.localIP(), "carduino-v4", s_args.ota_pwd, InternalStorage);
+            ArduinoOTA.begin(WiFi.localIP(), "expandasquirt-v4", s_args.ota_pwd, InternalStorage);
             display_set_pattern(DISPLAY_MAINT_READY);
             break;
         case MMState::UPLOAD_APPLYING:
@@ -5346,7 +5346,7 @@ ArduinoOTA.onError([](int code, const char* status) {
 
 - [ ] **Step 4: Call `maintenance_tick(millis())` from main loop**
 
-In `carduino-v4.ino`'s `loop()`:
+In `expandasquirt-v4.ino`'s `loop()`:
 
 ```c
 void loop() {
@@ -5365,14 +5365,14 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    carduino-v4/
+    expandasquirt-v4/
 ```
 
 Flash via USB. Connect BLE. Send `maintenance ssid=MEES psk=<actual> pwd=otatest`. Expected:
 
 1. Reply `OK maintenance armed timeout=3000`
 2. ~3 sec later, BLE drops
-3. Within ~30 sec, CARDUINO mDNS service appears on hotspot
+3. Within ~30 sec, EXPANDASQUIRT mDNS service appears on hotspot
 
 Verify mDNS via `dns-sd -B _arduino._tcp local.` from a laptop on the hotspot.
 
@@ -5387,7 +5387,7 @@ After Step 5 succeeds, push a test sketch via curl from a laptop on the hotspot 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add carduino-v4/maintenance_mode.{h,cpp} carduino-v4/carduino-v4.ino
+git add expandasquirt-v4/maintenance_mode.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
 git commit -m "feat: maintenance state machine with per-state timeouts and ArduinoOTA integration"
 ```
 
@@ -5396,7 +5396,7 @@ git commit -m "feat: maintenance state machine with per-state timeouts and Ardui
 ### Task 62: LED matrix maintenance patterns
 
 **Files:**
-- Modify: `carduino-v4/display_matrix.{h,cpp}`
+- Modify: `expandasquirt-v4/display_matrix.{h,cpp}`
 
 **What this does:** fills in the four maintenance LED patterns currently stubbed in `DESIGN.md` §6.5.
 
@@ -5464,7 +5464,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    carduino-v4/
+    expandasquirt-v4/
 ```
 
 Record program-storage and dynamic-memory percentages. **Hard stop if program storage > 49% (which would cross the half-flash apply boundary).**
@@ -5478,7 +5478,7 @@ If overflow: candidates to cut/compress, in order of preference:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add carduino-v4/display_matrix.{h,cpp}
+git add expandasquirt-v4/display_matrix.{h,cpp}
 git commit -m "feat: LED matrix patterns for maintenance pending/ready/applying/error + final size check"
 ```
 
@@ -5491,18 +5491,18 @@ git commit -m "feat: LED matrix patterns for maintenance pending/ready/applying/
 **Files:**
 - Create: `app/` directory (Android Studio project)
 - Create: `app/build.gradle.kts`, `app/src/main/AndroidManifest.xml`
-- Create: `app/src/main/java/works/mees/carduino/MainActivity.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/MainActivity.kt`
 - Create: `app/.gitignore` (Android-standard)
 
 - [ ] **Step 1: Generate project**
 
 In Android Studio: New Project → Empty Activity (Compose). Settings:
-- Application name: `Carduino`
-- Package: `works.mees.carduino`
+- Application name: `Expandasquirt`
+- Package: `works.mees.expandasquirt`
 - Min SDK: 26 (Android 8.0 — needed for `LocalOnlyHotspot`)
 - Target SDK: 35 (Android 16)
 - Build configuration: Kotlin DSL
-- Save location: `E:\claude\personal\miata\projects\carduino-v4\app`
+- Save location: `E:\claude\personal\\miata\\projects\\__OUTER_EXPANDASQUIRT_ROOT__\app`
 
 - [ ] **Step 2: Add core dependencies**
 
@@ -5543,10 +5543,10 @@ dependencies {
 
 Manifest declarations are necessary but not sufficient. On Android 12+ (`BLUETOOTH_SCAN/CONNECT`, `NEARBY_WIFI_DEVICES`) and Android 6+ (`ACCESS_FINE_LOCATION`), permissions need runtime grant. Block app entry on these.
 
-Create `app/src/main/java/works/mees/carduino/PermissionsGate.kt`:
+Create `app/src/main/java/works/mees/expandasquirt/PermissionsGate.kt`:
 
 ```kotlin
-package works.mees.carduino
+package works.mees.expandasquirt
 
 import android.Manifest
 import android.os.Build
@@ -5585,7 +5585,7 @@ fun PermissionsGate(content: @Composable () -> Unit) {
     } else {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(24.dp)) {
-                Text("Carduino needs Bluetooth, location, and nearby-devices permissions to scan for and talk to the device.", style = MaterialTheme.typography.bodyLarge)
+                Text("Expandasquirt needs Bluetooth, location, and nearby-devices permissions to scan for and talk to the device.", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = { launcher.launch(requiredPerms) }) { Text("Grant permissions") }
             }
@@ -5617,14 +5617,14 @@ git commit -m "feat: bootstrap Android Studio project with Compose, deps, and ru
 ### Task 64: BLE central — scan, connect, NUS service discovery
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ble/CarduinoBleClient.kt`
-- Create: `app/src/main/java/works/mees/carduino/ble/NusUuids.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ble/ExpandasquirtBleClient.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ble/NusUuids.kt`
 
 - [ ] **Step 1: NUS UUIDs**
 
 ```kotlin
-// app/src/main/java/works/mees/carduino/ble/NusUuids.kt
-package works.mees.carduino.ble
+// app/src/main/java/works/mees/expandasquirt/ble/NusUuids.kt
+package works.mees.expandasquirt.ble
 
 import java.util.UUID
 
@@ -5639,8 +5639,8 @@ object NusUuids {
 - [ ] **Step 2: Client wrapping `BluetoothGatt`**
 
 ```kotlin
-// CarduinoBleClient.kt
-package works.mees.carduino.ble
+// ExpandasquirtBleClient.kt
+package works.mees.expandasquirt.ble
 
 import android.bluetooth.*
 import android.content.Context
@@ -5654,7 +5654,7 @@ sealed class BleState {
     data class Failed(val reason: String) : BleState()
 }
 
-class CarduinoBleClient(private val ctx: Context) {
+class ExpandasquirtBleClient(private val ctx: Context) {
     private var gatt: BluetoothGatt? = null
     private var rxChar: BluetoothGattCharacteristic? = null
 
@@ -5703,7 +5703,7 @@ class CarduinoBleClient(private val ctx: Context) {
         true
     }
 
-    // Add to BluetoothGattCallback inside CarduinoBleClient:
+    // Add to BluetoothGattCallback inside ExpandasquirtBleClient:
     //   override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
     //       if (status == BluetoothGatt.GATT_SUCCESS) negotiatedMtu = mtu
     //   }
@@ -5764,13 +5764,13 @@ class CarduinoBleClient(private val ctx: Context) {
 
 - [ ] **Step 3: Manual smoke test**
 
-Add a tiny activity button that calls `connect("XX:XX:XX:XX:XX:XX")` with the actual Carduino MAC, hooks the `lines` flow into a Compose `LazyColumn`. Run on S25+, confirm the device's periodic dump arrives line-by-line.
+Add a tiny activity button that calls `connect("XX:XX:XX:XX:XX:XX")` with the actual Expandasquirt MAC, hooks the `lines` flow into a Compose `LazyColumn`. Run on S25+, confirm the device's periodic dump arrives line-by-line.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ble/
-git commit -m "feat: BLE central wrapping NUS service for Carduino comms"
+git add app/src/main/java/works/mees/expandasquirt/ble/
+git commit -m "feat: BLE central wrapping NUS service for Expandasquirt comms"
 ```
 
 ---
@@ -5778,14 +5778,14 @@ git commit -m "feat: BLE central wrapping NUS service for Carduino comms"
 ### Task 65: Periodic-dump parser
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ble/DumpParser.kt`
-- Create: `app/src/test/java/works/mees/carduino/ble/DumpParserTest.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ble/DumpParser.kt`
+- Create: `app/src/test/java/works/mees/expandasquirt/ble/DumpParserTest.kt`
 
 - [ ] **Step 1: Define parsed model**
 
 ```kotlin
 // DumpParser.kt
-package works.mees.carduino.ble
+package works.mees.expandasquirt.ble
 
 data class SensorReading(
     val name: String,
@@ -5806,7 +5806,7 @@ data class DumpFrame(
 
 ```kotlin
 // DumpParserTest.kt
-package works.mees.carduino.ble
+package works.mees.expandasquirt.ble
 
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -5905,7 +5905,7 @@ Expected: all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ble/DumpParser.kt app/src/test/
+git add app/src/main/java/works/mees/expandasquirt/ble/DumpParser.kt app/src/test/
 git commit -m "feat: BLE periodic-dump parser with unit tests"
 ```
 
@@ -5914,20 +5914,20 @@ git commit -m "feat: BLE periodic-dump parser with unit tests"
 ### Task 66: Dashboard screen (Layout B compact spec list)
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ui/DashboardScreen.kt`
-- Create: `app/src/main/java/works/mees/carduino/ui/DashboardViewModel.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/DashboardScreen.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/DashboardViewModel.kt`
 
 - [ ] **Step 1: ViewModel**
 
 ```kotlin
 // DashboardViewModel.kt
-package works.mees.carduino.ui
+package works.mees.expandasquirt.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import works.mees.carduino.ble.*
+import works.mees.expandasquirt.ble.*
 
 data class DashboardState(
     val deviceName: String = "—",
@@ -5937,7 +5937,7 @@ data class DashboardState(
 )
 
 class DashboardViewModel(
-    private val ble: CarduinoBleClient,
+    private val ble: ExpandasquirtBleClient,
 ) : ViewModel() {
     private val parser = DumpParser()
     private val _state = MutableStateFlow(DashboardState())
@@ -5952,7 +5952,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             ble.lines.collect { line ->
                 // Parse banner version line
-                if (line.startsWith("CARDUINO-v4 version=")) {
+                if (line.startsWith("EXPANDASQUIRT-v4 version=")) {
                     val ver = Regex("""version=(\S+)""").find(line)?.groupValues?.get(1)
                     _state.update { it.copy(firmwareVersion = ver) }
                 }
@@ -5968,7 +5968,7 @@ class DashboardViewModel(
 
 ```kotlin
 // DashboardScreen.kt
-package works.mees.carduino.ui
+package works.mees.expandasquirt.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -5982,7 +5982,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import works.mees.carduino.ble.SensorReading
+import works.mees.expandasquirt.ble.SensorReading
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -6071,12 +6071,12 @@ In `MainActivity.kt`, replace default Compose with `DashboardScreen(viewModel, {
 cd app && ./gradlew installDebug
 ```
 
-Connect to Carduino. Should see all 5 readings updating. Visual: matches Layout B mockup from brainstorm.
+Connect to Expandasquirt. Should see all 5 readings updating. Visual: matches Layout B mockup from brainstorm.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ui/Dashboard*
+git add app/src/main/java/works/mees/expandasquirt/ui/Dashboard*
 git commit -m "feat: live dashboard screen (Layout B compact spec list)"
 ```
 
@@ -6085,16 +6085,16 @@ git commit -m "feat: live dashboard screen (Layout B compact spec list)"
 ### Task 67: Device picker + DataStore persistence
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/persistence/DeviceStore.kt`
-- Create: `app/src/main/java/works/mees/carduino/ui/DevicePickerScreen.kt`
-- Create: `app/src/main/java/works/mees/carduino/ble/Scanner.kt`
-- Modify: `app/src/main/java/works/mees/carduino/MainActivity.kt` (NavHost between picker and dashboard)
+- Create: `app/src/main/java/works/mees/expandasquirt/persistence/DeviceStore.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/DevicePickerScreen.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ble/Scanner.kt`
+- Modify: `app/src/main/java/works/mees/expandasquirt/MainActivity.kt` (NavHost between picker and dashboard)
 
 - [ ] **Step 1: Persistence layer**
 
 ```kotlin
 // DeviceStore.kt
-package works.mees.carduino.persistence
+package works.mees.expandasquirt.persistence
 
 import android.content.Context
 import androidx.datastore.preferences.core.*
@@ -6150,7 +6150,7 @@ Add `kotlinx-serialization-json:1.7.3` to `build.gradle.kts` dependencies and ap
 
 ```kotlin
 // Scanner.kt
-package works.mees.carduino.ble
+package works.mees.expandasquirt.ble
 
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.*
@@ -6160,14 +6160,14 @@ import kotlinx.coroutines.flow.callbackFlow
 
 data class ScannedDevice(val mac: String, val name: String, val rssi: Int)
 
-fun scanForCarduinos(ctx: Context) = callbackFlow<ScannedDevice> {
+fun scanForExpandasquirts(ctx: Context) = callbackFlow<ScannedDevice> {
     val scanner = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
         .adapter.bluetoothLeScanner
 
     val cb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val name = result.device.name ?: result.scanRecord?.deviceName ?: return
-            if (name == "CARDUINO-v4") {
+            if (name == "EXPANDASQUIRT-v4") {
                 trySend(ScannedDevice(result.device.address, name, result.rssi))
             }
         }
@@ -6182,13 +6182,13 @@ fun scanForCarduinos(ctx: Context) = callbackFlow<ScannedDevice> {
 The data model is multi-aware (a list of `KnownDevice`) but the v1 UX is single-device. The picker shows:
 
 - If a current device is set: nothing — autoconnect from `MainActivity` skips this screen entirely.
-- If no current device: a "Nearby Carduinos" scan list. Tap one → name-prompt dialog → store as current → dashboard.
+- If no current device: a "Nearby Expandasquirts" scan list. Tap one → name-prompt dialog → store as current → dashboard.
 
 To switch devices later: a "Forget current device" affordance in the dashboard's overflow menu (not on the picker). Tapping that clears the current MAC and returns to this picker. No managed-list UI, no rename, no long-press, no last-seen display.
 
 ```kotlin
 // DevicePickerScreen.kt
-package works.mees.carduino.ui
+package works.mees.expandasquirt.ui
 
 import android.content.Context
 import androidx.compose.foundation.lazy.LazyColumn
@@ -6199,10 +6199,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collect
-import works.mees.carduino.ble.ScannedDevice
-import works.mees.carduino.ble.scanForCarduinos
-import works.mees.carduino.persistence.DeviceStore
-import works.mees.carduino.persistence.KnownDevice
+import works.mees.expandasquirt.ble.ScannedDevice
+import works.mees.expandasquirt.ble.scanForExpandasquirts
+import works.mees.expandasquirt.persistence.DeviceStore
+import works.mees.expandasquirt.persistence.KnownDevice
 
 @Composable
 fun DevicePickerScreen(
@@ -6212,12 +6212,12 @@ fun DevicePickerScreen(
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val seen = remember { mutableStateMapOf<String, ScannedDevice>() }
     LaunchedEffect(Unit) {
-        scanForCarduinos(ctx).collect { d -> seen[d.mac] = d }
+        scanForExpandasquirts(ctx).collect { d -> seen[d.mac] = d }
     }
     var promptMac by remember { mutableStateOf<String?>(null) }
-    var nickname by remember { mutableStateOf("Carduino") }
+    var nickname by remember { mutableStateOf("Expandasquirt") }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Pick a Carduino") }) }) { p ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Pick a Expandasquirt") }) }) { p ->
         Column(Modifier.padding(p).fillMaxSize().padding(16.dp)) {
             Text("Nearby devices", style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.height(8.dp))
@@ -6247,7 +6247,7 @@ fun DevicePickerScreen(
                 TextButton(onClick = {
                     val coroutineScope = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycleScope
                     coroutineScope.launch {
-                        store.upsert(KnownDevice(mac = mac, nickname = nickname.trim().ifEmpty { "Carduino" }, lastSeenEpochMs = System.currentTimeMillis()))
+                        store.upsert(KnownDevice(mac = mac, nickname = nickname.trim().ifEmpty { "Expandasquirt" }, lastSeenEpochMs = System.currentTimeMillis()))
                         store.setCurrent(mac)
                         promptMac = null
                         onSelect()
@@ -6286,12 +6286,12 @@ On launch: if `currentMac` is set, navigate directly to dashboard; else picker.
 
 - [ ] **Step 5: Manual test**
 
-Launch app on fresh install → picker shows. Tap Carduino → connects → dashboard. Force-quit. Re-launch → goes straight to dashboard.
+Launch app on fresh install → picker shows. Tap Expandasquirt → connects → dashboard. Force-quit. Re-launch → goes straight to dashboard.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/persistence/ app/src/main/java/works/mees/carduino/ui/DevicePicker* app/src/main/java/works/mees/carduino/ble/Scanner.kt app/src/main/java/works/mees/carduino/MainActivity.kt
+git add app/src/main/java/works/mees/expandasquirt/persistence/ app/src/main/java/works/mees/expandasquirt/ui/DevicePicker* app/src/main/java/works/mees/expandasquirt/ble/Scanner.kt app/src/main/java/works/mees/expandasquirt/MainActivity.kt
 git commit -m "feat: device picker + DataStore persistence (multi-aware data model, single-device UX)"
 ```
 
@@ -6300,12 +6300,12 @@ git commit -m "feat: device picker + DataStore persistence (multi-aware data mod
 ### Task 68: Connection lifecycle + autoconnect
 
 **Files:**
-- Modify: `app/src/main/java/works/mees/carduino/ble/CarduinoBleClient.kt` (add autoreconnect)
-- Modify: `app/src/main/java/works/mees/carduino/ui/DashboardViewModel.kt` (orchestrate)
+- Modify: `app/src/main/java/works/mees/expandasquirt/ble/ExpandasquirtBleClient.kt` (add autoreconnect)
+- Modify: `app/src/main/java/works/mees/expandasquirt/ui/DashboardViewModel.kt` (orchestrate)
 
 - [ ] **Step 1: Backoff schedule**
 
-In `CarduinoBleClient`, on `STATE_DISCONNECTED` (when state was `Connected`):
+In `ExpandasquirtBleClient`, on `STATE_DISCONNECTED` (when state was `Connected`):
 
 ```kotlin
 private val backoff = listOf(0L, 1_000L, 5_000L, 15_000L, 30_000L, 60_000L)
@@ -6349,7 +6349,7 @@ Launch app, connect, walk out of BLE range. Observe disconnect → reconnect att
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ble/CarduinoBleClient.kt app/src/main/java/works/mees/carduino/MainActivity.kt
+git add app/src/main/java/works/mees/expandasquirt/ble/ExpandasquirtBleClient.kt app/src/main/java/works/mees/expandasquirt/MainActivity.kt
 git commit -m "feat: BLE autoreconnect with backoff and lifecycle pause"
 ```
 
@@ -6358,14 +6358,14 @@ git commit -m "feat: BLE autoreconnect with backoff and lifecycle pause"
 ### Task 69: Diagnostic actions screen
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ui/DiagnosticsScreen.kt`
-- Create: `app/src/main/java/works/mees/carduino/ui/DiagnosticsViewModel.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/DiagnosticsScreen.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/DiagnosticsViewModel.kt`
 
 - [ ] **Step 1: ViewModel — single-shot command + result capture**
 
 ```kotlin
 // DiagnosticsViewModel.kt
-class DiagnosticsViewModel(private val ble: CarduinoBleClient) : ViewModel() {
+class DiagnosticsViewModel(private val ble: ExpandasquirtBleClient) : ViewModel() {
     private val _output = MutableStateFlow("")
     val output = _output.asStateFlow()
 
@@ -6429,7 +6429,7 @@ Tap each button. Expected: `>` echo of the command, then the device's response o
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ui/Diagnostics*
+git add app/src/main/java/works/mees/expandasquirt/ui/Diagnostics*
 git commit -m "feat: diagnostics screen wrapping reboot/selftest/clear-errors/boot-info/event-log"
 ```
 
@@ -6440,17 +6440,17 @@ git commit -m "feat: diagnostics screen wrapping reboot/selftest/clear-errors/bo
 ### Task 70: 🧪 Storage Access Framework file picker + size validation
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ota/FilePicker.kt`
-- Create: `app/src/main/java/works/mees/carduino/ota/SizeValidation.kt`
-- Create: `app/src/test/java/works/mees/carduino/ota/SizeValidationTest.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ota/FilePicker.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ota/SizeValidation.kt`
+- Create: `app/src/test/java/works/mees/expandasquirt/ota/SizeValidationTest.kt`
 
 - [ ] **Step 1: Define the size validation rule**
 
 ```kotlin
 // SizeValidation.kt
-package works.mees.carduino.ota
+package works.mees.expandasquirt.ota
 
-const val CARDUINO_R4_MAX_SKETCH_BYTES = 130_048   // ~half of 256 KB, page-aligned
+const val EXPANDASQUIRT_R4_MAX_SKETCH_BYTES = 130_048   // ~half of 256 KB, page-aligned
 
 sealed class SizeCheck {
     object Ok : SizeCheck()
@@ -6460,7 +6460,7 @@ sealed class SizeCheck {
 
 fun validateSketchSize(bytes: Long): SizeCheck = when {
     bytes <= 0 -> SizeCheck.Empty
-    bytes > CARDUINO_R4_MAX_SKETCH_BYTES -> SizeCheck.TooLarge(bytes, CARDUINO_R4_MAX_SKETCH_BYTES)
+    bytes > EXPANDASQUIRT_R4_MAX_SKETCH_BYTES -> SizeCheck.TooLarge(bytes, EXPANDASQUIRT_R4_MAX_SKETCH_BYTES)
     else -> SizeCheck.Ok
 }
 ```
@@ -6489,7 +6489,7 @@ Run: `./gradlew testDebugUnitTest`. Expected: pass.
 
 ```kotlin
 // FilePicker.kt
-package works.mees.carduino.ota
+package works.mees.expandasquirt.ota
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -6515,7 +6515,7 @@ fun rememberBinFilePicker(onPicked: (Uri, Long) -> Unit) = rememberLauncherForAc
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ota/ app/src/test/
+git add app/src/main/java/works/mees/expandasquirt/ota/ app/src/test/
 git commit -m "feat: SAF file picker + size validation with unit tests"
 ```
 
@@ -6529,11 +6529,11 @@ framework discards customConfig for non-system-priority callers
 (see V4X-DESIGN.md §11.2).
 
 **Shipped files:**
-- `app/src/main/java/works/mees/carduino/persistence/DeviceStore.kt` (extended with `HotspotCreds`)
-- `app/src/main/java/works/mees/carduino/ota/HotspotManager.kt`
-- `app/src/main/java/works/mees/carduino/ota/WifiQrParser.kt` + `WifiQrDecoder.kt` (ZXing dep added)
-- `app/src/main/java/works/mees/carduino/ui/HotspotSetupScreen.kt` + `HotspotSetupViewModel.kt`
-- `app/src/test/java/works/mees/carduino/ota/WifiQrParserTest.kt` (10 tests, all green)
+- `app/src/main/java/works/mees/expandasquirt/persistence/DeviceStore.kt` (extended with `HotspotCreds`)
+- `app/src/main/java/works/mees/expandasquirt/ota/HotspotManager.kt`
+- `app/src/main/java/works/mees/expandasquirt/ota/WifiQrParser.kt` + `WifiQrDecoder.kt` (ZXing dep added)
+- `app/src/main/java/works/mees/expandasquirt/ui/HotspotSetupScreen.kt` + `HotspotSetupViewModel.kt`
+- `app/src/test/java/works/mees/expandasquirt/ota/WifiQrParserTest.kt` (10 tests, all green)
 
 **Public API delivered:**
 - `suspend fun awaitHotspotNetwork(ctx, timeoutMillis): Network?` — captures the phone's own hotspot Network via `ConnectivityManager.NetworkCallback` filtered by `TRANSPORT_WIFI + NET_CAPABILITY_LOCAL_NETWORK` (API 33+; pre-T fallback marked with FIXME).
@@ -6546,7 +6546,7 @@ framework discards customConfig for non-system-priority callers
 **Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ota/LohManager.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ota/LohManager.kt`
 
 **Why both LOH callback + ConnectivityManager:** the LOH reservation gives us SSID/passphrase but not the underlying `Network` object. Task 73 needs the `Network` to scope OkHttp's socketFactory so the HTTP request actually goes through the LOH AP rather than cellular. We capture the Network via a `NetworkCallback` filtered for `TRANSPORT_WIFI + !NET_CAPABILITY_INTERNET` registered alongside LOH start.
 
@@ -6556,7 +6556,7 @@ framework discards customConfig for non-system-priority callers
 
 ```kotlin
 // LohManager.kt
-package works.mees.carduino.ota
+package works.mees.expandasquirt.ota
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -6680,7 +6680,7 @@ Specifically note:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ota/LohManager.kt prototypes/loh_android/notes-results.md
+git add app/src/main/java/works/mees/expandasquirt/ota/LohManager.kt prototypes/loh_android/notes-results.md
 git commit -m "feat: LocalOnlyHotspot with WPA2-forced config, Network capture for OkHttp scoping"
 ```
 
@@ -6693,10 +6693,10 @@ LOH-scoped discovery plan to the shipped Plan C flow: discovery is scoped to
 the captured phone-hotspot `Network`.
 
 **Shipped files:**
-- `app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt`
+- `app/src/main/java/works/mees/expandasquirt/ota/MdnsLookup.kt`
 
 **Public API delivered:**
-- `suspend fun discoverCarduino(ctx, network, expectedName, timeoutMillis): CarduinoEndpoint?` — discovers `_arduino._tcp` and returns `CarduinoEndpoint(host, port, serviceName)`.
+- `suspend fun discoverExpandasquirt(ctx, network, expectedName, timeoutMillis): ExpandasquirtEndpoint?` — discovers `_arduino._tcp` and returns `ExpandasquirtEndpoint(host, port, serviceName)`.
 - API 33+ uses the network-overload of `NsdManager.discoverServices`; pre-T uses a `bindProcessToNetwork` fallback.
 
 ---
@@ -6704,15 +6704,15 @@ the captured phone-hotspot `Network`.
 **Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ota/MdnsLookup.kt`
 
-**Why scoped:** Android's default `NsdManager.discoverServices` runs on the system-default network. While LOH is active that may be cellular (or a different WiFi). The Carduino's mDNS responder is only reachable on the LOH network. We scope discovery via `Network.bindSocket()` on a temporary socket, OR use the API 30+ `NsdManager.discoverServices(NsdManager.DiscoveryRequest)` overload that accepts a `Network`.
+**Why scoped:** Android's default `NsdManager.discoverServices` runs on the system-default network. While LOH is active that may be cellular (or a different WiFi). The Expandasquirt's mDNS responder is only reachable on the LOH network. We scope discovery via `Network.bindSocket()` on a temporary socket, OR use the API 30+ `NsdManager.discoverServices(NsdManager.DiscoveryRequest)` overload that accepts a `Network`.
 
 - [ ] **Step 1: Implementation**
 
 ```kotlin
 // MdnsLookup.kt
-package works.mees.carduino.ota
+package works.mees.expandasquirt.ota
 
 import android.content.Context
 import android.net.Network
@@ -6722,10 +6722,10 @@ import android.os.Build
 import kotlinx.coroutines.*
 import java.net.InetAddress
 
-suspend fun resolveCarduinoIp(
+suspend fun resolveExpandasquirtIp(
     ctx: Context,
     network: Network,
-    expectedName: String = "carduino-v4",
+    expectedName: String = "expandasquirt-v4",
     timeoutMs: Long = 15_000,
 ): InetAddress? = withTimeoutOrNull(timeoutMs) {
     val nsd = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager
@@ -6795,7 +6795,7 @@ For real validation: this only fully works once Tasks 71+72+73 chain together in
 - [ ] **Step 3: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt
+git add app/src/main/java/works/mees/expandasquirt/ota/MdnsLookup.kt
 git commit -m "feat: NsdManager mDNS lookup scoped to LOH Network"
 ```
 
@@ -6808,7 +6808,7 @@ JAndrassy/ArduinoOTA listener over the captured phone-hotspot `Network`,
 not a firmware-created LOH/AP path.
 
 **Shipped files:**
-- `app/src/main/java/works/mees/carduino/ota/OtaPusher.kt`
+- `app/src/main/java/works/mees/expandasquirt/ota/OtaPusher.kt`
 
 **Public API delivered:**
 - `suspend fun pushOta(ctx, endpoint, sketchUri, otaPassword, network, onProgress): OtaResult` — returns `Success`, `HttpError(code, body)`, or `NetworkError(cause)`.
@@ -6819,13 +6819,13 @@ not a firmware-created LOH/AP path.
 **Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ota/OtaPusher.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ota/OtaPusher.kt`
 
 - [ ] **Step 1: Implementation**
 
 ```kotlin
 // OtaPusher.kt
-package works.mees.carduino.ota
+package works.mees.expandasquirt.ota
 
 import android.content.Context
 import android.net.Uri
@@ -6908,7 +6908,7 @@ While Task 53's listener runs on the R4, call `pushOta(ctx, deviceIp, sketchUri,
 - [ ] **Step 3: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ota/OtaPusher.kt
+git add app/src/main/java/works/mees/expandasquirt/ota/OtaPusher.kt
 git commit -m "feat: OkHttp OTA push with progress + Basic auth + network binding"
 ```
 
@@ -6922,10 +6922,10 @@ and 7 unit tests. Commit `aff2997` delivered the wizard UI, navigation wiring,
 and dashboard menu entry.
 
 **Shipped files:**
-- `app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt`
-- `app/src/main/java/works/mees/carduino/ui/OtaWizardScreen.kt`
-- `app/src/main/java/works/mees/carduino/MainActivity.kt` (nav wiring)
-- `app/src/test/java/works/mees/carduino/ui/OtaPercentEncodeTest.kt`
+- `app/src/main/java/works/mees/expandasquirt/ui/OtaViewModel.kt`
+- `app/src/main/java/works/mees/expandasquirt/ui/OtaWizardScreen.kt`
+- `app/src/main/java/works/mees/expandasquirt/MainActivity.kt` (nav wiring)
+- `app/src/test/java/works/mees/expandasquirt/ui/OtaPercentEncodeTest.kt`
 
 **Public API / UI delivered:**
 - Full OTA state machine spanning `PickFile`, `PreFlight`, `HotspotSetup`, `EnteringMaintenance`, `FindingDevice`, `Uploading`, `Applying`, `Verifying`, `Done`, and `Failed`.
@@ -6936,8 +6936,8 @@ and dashboard menu entry.
 **Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ui/OtaWizardScreen.kt`
-- Create: `app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/OtaWizardScreen.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/OtaViewModel.kt`
 
 - [ ] **Step 1: ViewModel orchestrating the full flow**
 
@@ -6956,7 +6956,7 @@ sealed class OtaStep {
 }
 
 class OtaViewModel(
-    private val ble: CarduinoBleClient,
+    private val ble: ExpandasquirtBleClient,
     private val store: DeviceStore,
     private val ctx: Context,
 ) : ViewModel() {
@@ -7008,7 +7008,7 @@ class OtaViewModel(
             delay(3_000)  // grace for WiFi join
 
             _step.value = OtaStep.FindingDevice
-            val ip = resolveCarduinoIp(ctx, loh.network, timeoutMs = 15_000)
+            val ip = resolveExpandasquirtIp(ctx, loh.network, timeoutMs = 15_000)
             if (ip == null) { loh.close(); fail("Device didn't appear on hotspot", true); return@launch }
 
             _step.value = OtaStep.Uploading(0, 0)
@@ -7028,14 +7028,14 @@ class OtaViewModel(
                     _step.value = OtaStep.Verifying
                     val outcome = withTimeoutOrNull(30_000) {
                         ble.state.first { it is BleState.Connected }
-                        ble.lines.first { it.startsWith("CARDUINO-v4 version=") }
+                        ble.lines.first { it.startsWith("EXPANDASQUIRT-v4 version=") }
                     }
                     if (outcome == null) {
                         fail("Push outcome unknown and device didn't come back over BLE", true)
                     } else {
                         val newVer = Regex("""version=(\S+)""").find(outcome)?.groupValues?.get(1) ?: "unknown"
                         // We don't know what the pre-OTA version was here — for v1, just report "back online"
-                        store.upsert(KnownDevice(mac, store.known.first().firstOrNull { it.mac == mac }?.nickname ?: "Carduino", lastKnownVersion = newVer, lastSeenEpochMs = System.currentTimeMillis()))
+                        store.upsert(KnownDevice(mac, store.known.first().firstOrNull { it.mac == mac }?.nickname ?: "Expandasquirt", lastKnownVersion = newVer, lastSeenEpochMs = System.currentTimeMillis()))
                         _step.value = OtaStep.Done(newVer)
                     }
                 }
@@ -7053,7 +7053,7 @@ class OtaViewModel(
             // Reconnect BLE — autoreconnect should kick in. Just wait for state.
             val newVersion = withTimeoutOrNull(30_000) {
                 ble.state.first { it is BleState.Connected }
-                val ver = ble.lines.first { it.startsWith("CARDUINO-v4 version=") }
+                val ver = ble.lines.first { it.startsWith("EXPANDASQUIRT-v4 version=") }
                 Regex("""version=(\S+)""").find(ver)?.groupValues?.get(1) ?: "unknown"
             }
             if (newVersion == null) {
@@ -7064,7 +7064,7 @@ class OtaViewModel(
             val existing = store.known.first().firstOrNull { it.mac == mac }
             store.upsert(KnownDevice(
                 mac = mac,
-                nickname = existing?.nickname ?: "Carduino",
+                nickname = existing?.nickname ?: "Expandasquirt",
                 lastKnownVersion = newVersion,
                 lastSeenEpochMs = System.currentTimeMillis(),
             ))
@@ -7109,7 +7109,7 @@ fun OtaWizardScreen(vm: OtaViewModel, onDone: () -> Unit, onUsbRescue: () -> Uni
                 is OtaStep.PreFlight -> {
                     var ack by remember { mutableStateOf(false) }
                     Column {
-                        Text("File size: ${s.sizeBytes} bytes (${(100 * s.sizeBytes / CARDUINO_R4_MAX_SKETCH_BYTES)}% of flash)")
+                        Text("File size: ${s.sizeBytes} bytes (${(100 * s.sizeBytes / EXPANDASQUIRT_R4_MAX_SKETCH_BYTES)}% of flash)")
                         Spacer(Modifier.height(8.dp))
                         Text("⚠ Engine off, ignition on for stable power. Don't crank or cycle power until the app says complete.")
                         Spacer(Modifier.height(8.dp))
@@ -7160,15 +7160,15 @@ GIT_SHA=$(git rev-parse --short HEAD)
     --fqbn arduino:renesas_uno:unor4wifi \
     --output-dir build/test-ota/ \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    carduino-v4/
+    expandasquirt-v4/
 ```
 
-Then walk through the wizard with `build/test-ota/carduino-v4.ino.bin`. Expected: device reboots into 4.1.1, app reconnects, "Update complete. Now running 4.1.1." (Roll back to the original version via USB after testing.)
+Then walk through the wizard with `build/test-ota/expandasquirt-v4.ino.bin`. Expected: device reboots into 4.1.1, app reconnects, "Update complete. Now running 4.1.1." (Roll back to the original version via USB after testing.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ui/Ota*
+git add app/src/main/java/works/mees/expandasquirt/ui/Ota*
 git commit -m "feat: OTA wizard end-to-end orchestration (file pick → push → verify)"
 ```
 
@@ -7177,7 +7177,7 @@ git commit -m "feat: OTA wizard end-to-end orchestration (file pick → push →
 ### Task 75: Post-apply BLE reconnect verification (refine timing)
 
 **Files:**
-- Modify: `app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt` (refine verify step)
+- Modify: `app/src/main/java/works/mees/expandasquirt/ui/OtaViewModel.kt` (refine verify step)
 
 This is a refinement task — the wizard works after Task 74, but the verification timing may be flaky in real conditions. Use this task to tighten it.
 
@@ -7213,7 +7213,7 @@ fail("Device didn't come back over BLE in 30 sec", true)
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt
+git add app/src/main/java/works/mees/expandasquirt/ui/OtaViewModel.kt
 git commit -m "tune: post-apply verify timing based on bench measurement"
 ```
 
@@ -7221,12 +7221,12 @@ git commit -m "tune: post-apply verify timing based on bench measurement"
 
 ### Task 76: USB rescue screen
 
-✅ **SHIPPED 2026-05-05** in commit `37c5da2`. Files: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`, plus nav wiring in `MainActivity.kt`, button row in `DiagnosticsScreen.kt`, callback prop on `OtaWizardScreen.kt`.
+✅ **SHIPPED 2026-05-05** in commit `37c5da2`. Files: `app/src/main/java/works/mees/expandasquirt/ui/UsbRescueScreen.kt`, plus nav wiring in `MainActivity.kt`, button row in `DiagnosticsScreen.kt`, callback prop on `OtaWizardScreen.kt`.
 
 The screen documents the standard Arduino R4 procedure (double-tap reset → yellow LED pulses → arduino-cli upload). The original plan included a bench-verification step for the bootloader-force fallback on Matthew's specific R4 clone (in case the clone differs from the official board). That step was dropped 2026-05-06: the failure mode it covers (a sketch so broken it hangs USB enumeration before bootloader handshake) is implausible for any firmware that compiles and passes the boot self-tests, and standard `arduino-cli upload` is the recovery path that would actually be used. If the clone ever does turn out to differ at bench, update the screen's footer note and `docs/bench-test-procedures.md`.
 
 **Files:**
-- Create: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`
+- Create: `app/src/main/java/works/mees/expandasquirt/ui/UsbRescueScreen.kt`
 - Modify: `docs/bench-test-procedures.md` (add bootloader-force section)
 
 - [ ] **Step 2: Bundled instructions (use real verified procedure)**
@@ -7239,7 +7239,7 @@ fun UsbRescueScreen(onBack: () -> Unit) {
             Text("If wireless update failed, recover via USB:", fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
 
-            Text("1. Plug the Carduino's USB-C port into a laptop with `arduino-cli` installed.")
+            Text("1. Plug the Expandasquirt's USB-C port into a laptop with `arduino-cli` installed.")
             Spacer(Modifier.height(8.dp))
 
             Text("2. If the device isn't seen, force the bootloader:")
@@ -7250,7 +7250,7 @@ fun UsbRescueScreen(onBack: () -> Unit) {
             Text("3. Re-flash the last known-good firmware:")
             Card(modifier = Modifier.padding(vertical = 4.dp)) {
                 Text(
-                    """arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/carduino-v4/""",
+                    """arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/expandasquirt-v4/""",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(8.dp),
@@ -7275,7 +7275,7 @@ In `DiagnosticsScreen`, add a button: `FilledTonalButton(onClick = onUsbRescue) 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt docs/bench-test-procedures.md
+git add app/src/main/java/works/mees/expandasquirt/ui/UsbRescueScreen.kt docs/bench-test-procedures.md
 git commit -m "feat: USB rescue screen + bootloader-force procedure verified on R4 clone"
 ```
 
@@ -7331,7 +7331,7 @@ git commit -m "test: v4.x OTA wizard end-to-end bench validation"
 - [ ] **Step 1: Procedure**
 
 With device installed in car (post Task 50):
-1. Engine off, ignition on (Carduino has stable power).
+1. Engine off, ignition on (Expandasquirt has stable power).
 2. App on phone, connected via BLE.
 3. Push a small firmware revision via the wizard.
 4. Verify dashboard reads new version after reboot.
@@ -7459,7 +7459,7 @@ After writing the v4.x phases, I checked them against the spec at `V4X-DESIGN.md
   - §11 open verification items — Phase L (bench prototypes) covers the main two; remaining items are flagged in individual tasks
 - **Phase J supersession** — explicit Task 79 cleanup.
 - **Placeholder scan:** all steps have actual code or commands. A few intentional placeholders for actual measured values (Task 53 step 9 results template, Task 75 timing tuning) — these are deliberate and noted as "fill in real values" in context.
-- **Type consistency:** `MaintenanceArgs`, `MMState`, `BleState`, `DumpFrame`, `SensorReading`, `KnownDevice`, `CarduinoEndpoint`, `OtaStep`, `OtaResult`, `SizeCheck` consistent across tasks that reference them.
+- **Type consistency:** `MaintenanceArgs`, `MMState`, `BleState`, `DumpFrame`, `SensorReading`, `KnownDevice`, `ExpandasquirtEndpoint`, `OtaStep`, `OtaResult`, `SizeCheck` consistent across tasks that reference them.
 - **Granularity:** 28 tasks across 5 phases. Phase L (3) gates the rest. Phases M-N-O are sequential within phase but Phases N and M can proceed in parallel after L. Phase P is final integration.
 - **Dependencies:**
   - Phase L → blocks Phase M, N, O

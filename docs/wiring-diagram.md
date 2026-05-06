@@ -1,6 +1,6 @@
-# CARDUINO v4 Wiring
+# EXPANDASQUIRT v4 Wiring
 
-Pin assignments in this document use `carduino-v4/config.h` as canonical where
+Pin assignments in this document use `expandasquirt-v4/config.h` as canonical where
 firmware constants exist. They match `DESIGN.md` section 2.3.
 
 ## Power

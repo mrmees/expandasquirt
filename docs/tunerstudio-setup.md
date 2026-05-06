@@ -1,9 +1,9 @@
-# TunerStudio Setup for CARDUINO v4
+# TunerStudio Setup for EXPANDASQUIRT v4
 
 Field names in this doc match TunerStudio 3.x. Newer versions may rename fields
 slightly; the navigation paths and semantic intent stay constant.
 
-CARDUINO v4 transmits two standard 8-byte CAN frames at 500 kbps. The MS3
+EXPANDASQUIRT v4 transmits two standard 8-byte CAN frames at 500 kbps. The MS3
 project receives the five sensor channels as CAN ADC inputs, each encoded as an
 unsigned 16-bit big-endian value in engineering units times 10.
 
@@ -11,7 +11,7 @@ unsigned 16-bit big-endian value in engineering units times 10.
 
 - TunerStudio 3.x or newer.
 - MS3Pro PNP project loaded.
-- CARDUINO v4 connected to the MS3 CAN bus through the MCP2515 shield.
+- EXPANDASQUIRT v4 connected to the MS3 CAN bus through the MCP2515 shield.
 - CAN bus configured for 500 kbps, matching `DESIGN.md` section 5.1.
 
 ## CAN Receiving
@@ -20,7 +20,7 @@ Navigate to **CAN Bus / Testmodes -> CAN Receiving**.
 
 Configure these CAN ADC inputs:
 
-| CAN ADC | ID | offset | size | CARDUINO field | Units on wire |
+| CAN ADC | ID | offset | size | EXPANDASQUIRT field | Units on wire |
 |---------|----|--------|------|----------------|---------------|
 | CAN ADC01 | 1025 | 0 | B2U | Oil temperature | deg F x 10 |
 | CAN ADC02 | 1025 | 2 | B2U | Oil pressure | PSI x 10 |
@@ -28,7 +28,7 @@ Configure these CAN ADC inputs:
 | CAN ADC04 | 1025 | 6 | B2U | Pre-supercharger pressure | kPa x 10 |
 | CAN ADC05 | 1026 | 0 | B2U | Post-supercharger air temperature | deg F x 10 |
 
-`B2U` is the required size because CARDUINO sends each sensor as a 2-byte
+`B2U` is the required size because EXPANDASQUIRT sends each sensor as a 2-byte
 unsigned big-endian value. Do not map Frame 2 bytes 2-7 as sensor channels:
 those bytes carry reserved data, sequence counter, health bitmask, status flags,
 and max held-value age.
@@ -62,7 +62,7 @@ Map each CAN ADC input to a generic sensor channel:
 | Pre-supercharger pressure | CAN ADC04 | kPa | 10 |
 | Post-supercharger air temperature | CAN ADC05 | deg F | 10 |
 
-The divisor is 10 for every CARDUINO sensor because the firmware sends one
+The divisor is 10 for every EXPANDASQUIRT sensor because the firmware sends one
 decimal place as an integer.
 
 ## Datalog Channels
@@ -75,9 +75,9 @@ Add the mapped generic sensor channels to the active datalog template:
 - Pre-supercharger pressure
 - Post-supercharger air temperature
 
-## CARDUINO Receive Frame
+## EXPANDASQUIRT Receive Frame
 
-CARDUINO listens for the MS3 dash broadcast group on CAN ID 1512 (`0x5E8`).
+EXPANDASQUIRT listens for the MS3 dash broadcast group on CAN ID 1512 (`0x5E8`).
 Bytes 2-3 carry RPM as `uint16` big-endian. The firmware uses that RPM value as
 the primary engine-running gate for flatline detection; no TunerStudio Generic
 Sensor Input mapping is required for this receive path.

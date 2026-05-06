@@ -1,13 +1,13 @@
-# CARDUINO v4 Bench Test Procedures
+# EXPANDASQUIRT v4 Bench Test Procedures
 
 These procedures expand the Phase 1 bench tests from `DESIGN.md` section 8.1.
 Test IDs and titles are copied from that section. Numeric constants come from
-`DESIGN.md` or `carduino-v4/config.h`; when the source does not define a
+`DESIGN.md` or `expandasquirt-v4/config.h`; when the source does not define a
 numeric threshold, this document says so.
 
 ## Common Setup
 
-- CARDUINO v4 hardware with Freenove FNK0096 / Uno R4 WiFi clone.
+- EXPANDASQUIRT v4 hardware with Freenove FNK0096 / Uno R4 WiFi clone.
 - Keyestudio EF02037 MCP2515 CAN-Bus Shield seated on the R4 headers.
 - Switched 12V bench supply feeding the buck-boost regulator, then the R4 VIN
   through the 1A polyfuse.
@@ -20,7 +20,7 @@ numeric threshold, this document says so.
 Build before bench work:
 
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi carduino-v4/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
 ```
 
 Host-side unit tests before bench work:
@@ -51,7 +51,7 @@ Steps:
 Pass criteria:
 - No smoke, odor, abnormal heating, or current-limit event.
 - Buck-boost output remains regulated at 12V.
-- R4 boots and prints `CARDUINO v4 booting...`.
+- R4 boots and prints `EXPANDASQUIRT v4 booting...`.
 - Idle current is measured and recorded. `DESIGN.md` section 8.1 requires an
   expected idle-current check, but no numeric expected current is specified in
   the design or code.
@@ -66,7 +66,7 @@ Source behavior:
 - `ERR03` is BLE init failure and continues degraded.
 
 Setup:
-- CARDUINO powered on the bench.
+- EXPANDASQUIRT powered on the bench.
 - USB serial connected at 115200 baud.
 - LED matrix visible.
 
@@ -96,7 +96,7 @@ Purpose: sweep ADC channels and verify raw tracking, EWMA filtering,
 conversion, and fault detection.
 
 Setup:
-- Potentiometer wired as a 0-5V signal source sharing CARDUINO 5V and GND.
+- Potentiometer wired as a 0-5V signal source sharing EXPANDASQUIRT 5V and GND.
 - 100 nF ADC noise cap remains installed on the channel under test.
 - USB serial connected for the temporary 500 ms sensor printout.
 
@@ -156,7 +156,7 @@ Setup:
 - Valid sensor inputs or stable injected values on A0-A4.
 
 Steps:
-1. Power CARDUINO and start the CAN capture.
+1. Power EXPANDASQUIRT and start the CAN capture.
 2. Capture frame ID 1025 (`0x401`) and frame ID 1026 (`0x402`).
 3. Verify both frames are 8 bytes and repeat at 10 Hz.
 4. Decode Frame 1:
@@ -249,7 +249,7 @@ Setup:
 - Normal firmware build.
 
 Steps:
-1. Boot CARDUINO and record the printed boot counter and reset cause.
+1. Boot EXPANDASQUIRT and record the printed boot counter and reset cause.
 2. Reboot the board.
 3. Confirm the boot counter increments.
 4. Set a fatal error through firmware code only if an existing test hook is

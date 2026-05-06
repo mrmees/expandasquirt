@@ -1,4 +1,4 @@
-# CARDUINO v4.x — Companion App + Maintenance Mode Design
+# EXPANDASQUIRT v4.x — Companion App + Maintenance Mode Design
 
 **Status:** Draft, brainstorming output. Pre-implementation. Supersedes the deferred-to-v4.x sections of `DESIGN.md` (§6.4.3 placeholder, §6.5 maintenance LED states, §10 OTA-related open questions) and the stale Phase J in `IMPLEMENTATION-PLAN.md`.
 
@@ -33,7 +33,7 @@
 
 ```
 ┌─────────────────────┐       BLE NUS        ┌──────────────────────┐
-│  Android app        │ <─────────────────>  │  CARDUINO v4 + v4.x  │
+│  Android app        │ <─────────────────>  │  EXPANDASQUIRT v4 + v4.x  │
 │  (Kotlin/Compose)   │                      │  firmware additions  │
 │                     │                      │                      │
 │  - BLE central      │ Phone hotspot        │  - Maintenance state │
@@ -45,9 +45,9 @@
 └─────────────────────┘                      └──────────────────────┘
 ```
 
-The Carduino has two transport modes: **normal** (BLE up, WiFi off, CAN/sensors live) and **maintenance** (BLE down, WiFi STA up, sensors/CAN halted, ArduinoOTA listener active). The transition is one-way during a maintenance event; recovery to normal mode is via reboot. **The transports never run concurrently** — DESIGN.md §6.6 rejected dual-stack BLE+WiFi for normal-mode reasons, and the brief transition window is structured to keep them serial as well.
+The Expandasquirt has two transport modes: **normal** (BLE up, WiFi off, CAN/sensors live) and **maintenance** (BLE down, WiFi STA up, sensors/CAN halted, ArduinoOTA listener active). The transition is one-way during a maintenance event; recovery to normal mode is via reboot. **The transports never run concurrently** — DESIGN.md §6.6 rejected dual-stack BLE+WiFi for normal-mode reasons, and the brief transition window is structured to keep them serial as well.
 
-**IP discovery:** since BLE is down before WiFi is up, the app can't receive the device's DHCP-assigned IP over BLE. Discovery is via **mDNS** (`carduino-v4._arduino._tcp.local`, advertised by the JAndrassy library's default mDNS responder). The Android side uses `NsdManager.discoverServices()` without Network scoping; multicast propagates out all interfaces by default. mDNS reachability on the R4's modem firmware is one of the bench-prototype gates (§11).
+**IP discovery:** since BLE is down before WiFi is up, the app can't receive the device's DHCP-assigned IP over BLE. Discovery is via **mDNS** (`expandasquirt-v4._arduino._tcp.local`, advertised by the JAndrassy library's default mDNS responder). The Android side uses `NsdManager.discoverServices()` without Network scoping; multicast propagates out all interfaces by default. mDNS reachability on the R4's modem firmware is one of the bench-prototype gates (§11).
 
 ### 3.2 OTA flow
 
@@ -58,16 +58,16 @@ Normal: BLE active, dashboard updates                          [user taps "Firmw
                                                                [user enables phone hotspot]
                                                                [app reads ssid/psk from DataStore or QR import]
 1. App sends: maintenance ssid=<pct> psk=<pct> pwd=<pct>\n  (BLE)
-2. Carduino:  reply OK maintenance armed timeout=3000 → MM_ARMED → 3s drain → end BLE
-3. Carduino:  switch modem to STA, WiFi.begin(ssid, psk)
-4. Carduino:  ArduinoOTA.begin(ip, "carduino-v4", pwd, InternalStorage)
+2. Expandasquirt:  reply OK maintenance armed timeout=3000 → MM_ARMED → 3s drain → end BLE
+3. Expandasquirt:  switch modem to STA, WiFi.begin(ssid, psk)
+4. Expandasquirt:  ArduinoOTA.begin(ip, "expandasquirt-v4", pwd, InternalStorage)
               [JAndrassy default registers mDNS responder for _arduino._tcp.local]
-5. App:       waits ~5s post-BLE-drop, then mDNS-resolves "carduino-v4._arduino._tcp.local"
+5. App:       waits ~5s post-BLE-drop, then mDNS-resolves "expandasquirt-v4._arduino._tcp.local"
               via Android NsdManager → device IP
 6. App:       POST http://<ip>:65280/sketch with Basic auth, body=raw .bin
-7. Carduino:  read body → InternalStorage.write() loop → 200 OK → apply()
-8. Carduino:  flash erase + copy from staging + NVIC_SystemReset
-9. Carduino:  boots into new firmware, BLE advertises again
+7. Expandasquirt:  read body → InternalStorage.write() loop → 200 OK → apply()
+8. Expandasquirt:  flash erase + copy from staging + NVIC_SystemReset
+9. Expandasquirt:  boots into new firmware, BLE advertises again
 10. App:      reconnects BLE, reads banner, verifies version token matches expected
 ```
 
@@ -77,7 +77,7 @@ Normal: BLE active, dashboard updates                          [user taps "Firmw
 
 ### 4.1 Screens
 
-**S1. Device picker / first-run.** Shows on first launch or when no current device is set. Scan results filter to `CARDUINO-v4` advertised name. Tap one → set as current → navigate to dashboard. Includes a "rescan" affordance. Reachable later via the device-name button in the dashboard top bar.
+**S1. Device picker / first-run.** Shows on first launch or when no current device is set. Scan results filter to `EXPANDASQUIRT-v4` advertised name. Tap one → set as current → navigate to dashboard. Includes a "rescan" affordance. Reachable later via the device-name button in the dashboard top bar.
 
 **S2. Live dashboard.** Default screen after first connect. Layout B — compact spec list of the 5 sensors (oilT, oilP, fuelP, preP, postT) with health-dot indicator, value, and unit. Below the list: small meta strip (`seq · health 0xNN · age N.Ns`). Top bar: device nickname (tap → S1), connection state, overflow menu. Refresh cadence: ~2 Hz from the parsed BLE periodic dump (firmware sends at 5 Hz; app coalesces).
 
@@ -97,7 +97,7 @@ Each wraps the corresponding existing BLE command. Output is shown as monospace 
 3. Hotspot setup + push: collects or confirms the phone hotspot SSID/password, requires WPA2-Personal, opens Android hotspot settings for the user to toggle the hotspot on, sends BLE `maintenance` command, BLE drops, mDNS lookup resolves device IP, POSTs the file. Shows a progress bar during HTTP upload.
 4. Apply: spinner with "Device is flashing. Don't disturb." message. 30 sec timeout for BLE re-discovery.
 5. Verify: reads connect banner of new device, shows version token. "Update complete" or "Verification failed — try USB rescue."
-6. USB rescue (failure dead-end): bundled local screen with the exact `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> carduino-v4/` command and bootloader-force steps. Reachable from the wizard's failure path AND from the diagnostic screen anytime.
+6. USB rescue (failure dead-end): bundled local screen with the exact `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/` command and bootloader-force steps. Reachable from the wizard's failure path AND from the diagnostic screen anytime.
 
 ### 4.2 State / persistence
 
@@ -113,7 +113,7 @@ Persisted hotspot SSID/password in DataStore for repeat OTA runs. No persisted s
 
 ### 4.3 BLE central behavior
 
-- Scan filter: advertised local name == `CARDUINO-v4`.
+- Scan filter: advertised local name == `EXPANDASQUIRT-v4`.
 - Connect to current device's MAC.
 - Discover NUS service (`6E400001-...`), TX char (notify, `...0003-...`), RX char (write, `...0002-...`).
 - Subscribe to TX notify on connect.
@@ -133,10 +133,10 @@ Used only during the OTA wizard's push step. LOH was rejected because Android 16
    - Repeat path: SSID + password are pre-filled from DataStore. User can edit them or tap **Use saved**. A **Clear saved hotspot** action belongs on the diagnostics screen later; out of scope for this document's screen detail.
 4. After the user enables their phone hotspot in system settings and confirms credentials in the wizard, the app proceeds without capturing a `Network` handle. Bench-verified on Pixel 8 / Android 16 r4 (2026-05-05): when the phone acts as a hotspot AP, Android does NOT expose the hotspot interface as a Network in `ConnectivityManager` — only the phone's own WiFi STA Network is visible. The phone's kernel routes packets to the hotspot subnet through the AP interface automatically (specific-subnet route in the routing table), so OkHttp and NsdManager work correctly without explicit Network scoping.
 5. App sends BLE `maintenance ssid=<pct> psk=<pct> pwd=<pct>\n` using the confirmed SSID/password and generated OTA password. Firmware behavior is unchanged.
-6. R4 joins the user-enabled hotspot. App waits ~5s after BLE drop, discovers `carduino-v4._arduino._tcp.local` via `NsdManager.discoverServices("_arduino._tcp.", PROTOCOL_DNS_SD)`, then pushes the firmware over HTTP as before.
+6. R4 joins the user-enabled hotspot. App waits ~5s after BLE drop, discovers `expandasquirt-v4._arduino._tcp.local` via `NsdManager.discoverServices("_arduino._tcp.", PROTOCOL_DNS_SD)`, then pushes the firmware over HTTP as before.
 7. On terminal success or failure, app prompts: "You can turn the hotspot off now." Android does not expose unprivileged APIs to toggle tethering off programmatically.
 
-The HTTP request does not need app-level Network scoping. The phone's kernel has the specific hotspot-subnet route through the AP interface, so an ordinary OkHttp request to the discovered Carduino IP routes correctly.
+The HTTP request does not need app-level Network scoping. The phone's kernel has the specific hotspot-subnet route through the AP interface, so an ordinary OkHttp request to the discovered Expandasquirt IP routes correctly.
 
 ### 4.5 OTA HTTP push (Kotlin sketch, illustrative)
 
@@ -205,7 +205,7 @@ Cancel armed maintenance before BLE drop only. Not supported after BLE teardown.
 Existing connect banner sends reset cause / boot counter / last fatal err per `DESIGN.md:542-543`. Extend it to start with a parseable version line:
 
 ```
-CARDUINO-v4 version=4.x.y build=<git>\r\n
+EXPANDASQUIRT-v4 version=4.x.y build=<git>\r\n
 reset=<cause> boot=<n> last_err=<code>\r\n
 ... (rest of existing banner)
 ```
@@ -220,7 +220,7 @@ The first line gives the app a reliable verification source post-OTA.
 | `MM_ARMED` | Reply `OK maintenance armed timeout=3000`; LED maintenance-pending pattern; send final CAN status frame with maintenance bit set; stop periodic BLE dumps. | 3 sec elapsed → `MM_BLE_DRAIN`. `maintenance abort\n` → `MM_ABORTING`. | 10 sec absolute max → `MM_ABORTING`. |
 | `MM_BLE_DRAIN` | 1 sec drain window for in-flight BLE TX. No new BLE traffic generated here — the app already received `OK maintenance armed timeout=3000` in `MM_ARMED` and knows BLE will go down. | Drain window elapsed → `MM_WIFI_JOINING`. | Hard 1 sec cap. |
 | `MM_WIFI_JOINING` | End BLE; switch modem to STA; `WiFi.begin(ssid, psk)`. | `WL_CONNECTED` and `localIP()` valid → `MM_OTA_READY`. | 30 sec join deadline → reboot to NORMAL (recovery). |
-| `MM_OTA_READY` | `ArduinoOTA.begin(localIp, "carduino-v4", pwd, InternalStorage)` — JAndrassy default global is the mDNS variant, so `_arduino._tcp.local` is advertised automatically; LED maintenance-ready pattern. | Library's `onStartCallback` fires → `MM_UPLOAD_APPLYING`. | 5 min idle → reboot to NORMAL. |
+| `MM_OTA_READY` | `ArduinoOTA.begin(localIp, "expandasquirt-v4", pwd, InternalStorage)` — JAndrassy default global is the mDNS variant, so `_arduino._tcp.local` is advertised automatically; LED maintenance-ready pattern. | Library's `onStartCallback` fires → `MM_UPLOAD_APPLYING`. | 5 min idle → reboot to NORMAL. |
 | `MM_UPLOAD_APPLYING` | LED maintenance-applying pattern. Call `ArduinoOTA.poll()` from main loop. | Successful upload causes library to `apply()` and `NVIC_SystemReset` (control never returns). Library `onErrorCallback` → `MM_OTA_ERROR`. | Hardware watchdog catches stuck-during-poll. Reboot recovers. |
 | `MM_OTA_ERROR` | LED error pattern; ERR99 on display; clear WiFi. | 5 sec elapsed → reboot to NORMAL. | 5 sec hard. |
 | `MM_ABORTING` | Reply `OK maintenance aborted` (if BLE still up); restore normal LED. | Immediate → `MM_NORMAL`. | None. |
@@ -259,12 +259,12 @@ Pure HTTP `POST /sketch HTTP/1.1` to port 65280. Headers: `Authorization: Basic 
 |---|---|---|
 | User selected wrong hotspot security mode | Same as wrong-PSK: R4 hits `MM_WIFI_JOINING` 30 sec timeout, then BLE rediscovers without OTA completion | Wizard surfaces "Hotspot security check — must be WPA2-Personal, not WPA3 or Transition. Open hotspot settings and switch." |
 | mDNS lookup times out (device on hotspot but not advertising) | `NsdManager.discoverServices` 15 sec timeout without resolving | "Device didn't appear on hotspot. Verify hotspot is up and try again, or use USB update." Possible causes: WiFi join failed silently, mDNS responder not bridged by modem firmware, or phone hotspot client isolation. |
-| WiFi join fails on Carduino (wrong PSK, AP unavailable) | `MM_WIFI_JOINING` 30 sec timeout → reboot | Carduino comes back to `MM_NORMAL` and BLE-advertises. App sees BLE rediscovery without OTA completion → "WiFi join failed, retry." |
+| WiFi join fails on Expandasquirt (wrong PSK, AP unavailable) | `MM_WIFI_JOINING` 30 sec timeout → reboot | Expandasquirt comes back to `MM_NORMAL` and BLE-advertises. App sees BLE rediscovery without OTA completion → "WiFi join failed, retry." |
 | HTTP push fails before 200 (4xx, network error, write timeout) | OkHttp call returns error or non-200 | Active sketch is intact (no `apply()` ran). User retries. |
 | HTTP push outcome unknown (read timeout after sending body) | OkHttp read times out | Wait 30 sec, scan BLE for device. If banner shows new version → success despite missed response. If banner shows old version → upload didn't apply, retry. If no device found → USB rescue. |
 | Apply succeeds but new firmware doesn't boot | App's 30 sec post-200 BLE re-discovery times out | Show USB rescue screen with copy-paste `arduino-cli` command. |
-| Carduino stuck in `MM_OTA_READY` (user didn't push within 5 min) | 5 min state machine timeout | Auto-reboot to NORMAL. App sees BLE rediscovery, no version change, treats as "user-cancelled by inaction". |
-| Carduino stuck in `MM_UPLOAD_APPLYING` mid-transfer (hung TCP) | 8 sec hardware watchdog | Reboot. Active sketch intact; staging area discarded on next OTA's `_storage->open()`. App sees rediscovery without version change → retry. |
+| Expandasquirt stuck in `MM_OTA_READY` (user didn't push within 5 min) | 5 min state machine timeout | Auto-reboot to NORMAL. App sees BLE rediscovery, no version change, treats as "user-cancelled by inaction". |
+| Expandasquirt stuck in `MM_UPLOAD_APPLYING` mid-transfer (hung TCP) | 8 sec hardware watchdog | Reboot. Active sketch intact; staging area discarded on next OTA's `_storage->open()`. App sees rediscovery without version change → retry. |
 
 ---
 
@@ -276,7 +276,7 @@ A bundled in-app screen (no internet required) showing:
 2. **Force the bootloader if the device isn't seen:** double-tap the reset button to enter bootloader mode (verify procedure on Matthew's specific R4 clone before publishing).
 3. **Re-flash with:**
    ```
-   arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/carduino-v4/
+   arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/expandasquirt-v4/
    ```
 4. **Verify** by re-opening the app and confirming the banner version.
 
@@ -338,7 +338,7 @@ Android 16 r4 does not allow regular apps to supply an effective custom LocalOnl
 - When `mIsExclusive` is false, `WifiApConfigStore.generateLocalOnlyHotspotConfig` discards the app-provided `customConfig` and generates a system LOH config instead.
 - A regular app's WorkSource priority is `PRIORITY_FG_APP`, never `PRIORITY_SYSTEM`. Platform-signed apps only reach `PRIORITY_PRIVILEGED`, so reflection and hidden-API access do not help; the gate is WorkSource priority, not API surface.
 - `Flags.publicBandsForLohs()` is on by default on Android 16 r4 per bench observation.
-- Bench result, 2026-05-05: Pixel 8, app uid 10312, requested `CARDUINO-OTA` + `WPA2_PSK`; framework returned `AndroidShare_7223` + `WPA3_SAE_TRANSITION`. R4 hit `MM_WIFI_JOINING` 30-sec timeout and rebooted.
+- Bench result, 2026-05-05: Pixel 8, app uid 10312, requested `EXPANDASQUIRT-OTA` + `WPA2_PSK`; framework returned `AndroidShare_7223` + `WPA3_SAE_TRANSITION`. R4 hit `MM_WIFI_JOINING` 30-sec timeout and rebooted.
 - R4 modem firmware 0.6.0 is the latest available as of May 2024. Renesas board package 1.5.3 is latest as of February 2026, with 128-byte TX buffer. No WPA3 SAE fix is in the pipeline.
 
 Conclusion: the production OTA path must ask the user to start a phone hotspot manually and configure it as WPA2-Personal.

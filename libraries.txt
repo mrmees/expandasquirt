@@ -1,4 +1,4 @@
-# CARDUINO v4 — pinned library versions
+# EXPANDASQUIRT v4 — pinned library versions
 # Update this file whenever bumping a dependency.
 #
 # Libraries are installed in the user Arduino sketchbook

@@ -2,5 +2,11 @@
 <resources>
     <!-- Compose handles all theming through MaterialTheme; this is just the
          splash/window theme used before the activity composables run. -->
-    <style name="Theme.Carduino" parent="android:Theme.Material.NoActionBar.Fullscreen" />
+    <style name="Theme.Expandasquirt" parent="android:Theme.DeviceDefault.NoActionBar" />
+
+    <style name="Theme.Expandasquirt.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenBackground">@color/launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Expandasquirt</item>
+    </style>
 </resources>

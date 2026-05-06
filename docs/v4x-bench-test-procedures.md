@@ -1,4 +1,4 @@
-# CARDUINO v4.x OTA Bench Test Procedures
+# EXPANDASQUIRT v4.x OTA Bench Test Procedures
 
 End-to-end bench validation of the v4.x OTA wizard (`maintenance` BLE
 command → manual phone hotspot → mDNS → HTTP upload to JAndrassy
@@ -8,13 +8,13 @@ verify). Architecture in `V4X-DESIGN.md`; task spec in
 
 ## Setup
 
-- CARDUINO v4 hardware (R4 WiFi) with the v4.1.0 baseline sketch loaded.
-- Phone with the carduino companion app installed (debug build is fine),
-  paired to the Carduino over BLE on the dashboard screen.
+- EXPANDASQUIRT v4 hardware (R4 WiFi) with the v4.1.0 baseline sketch loaded.
+- Phone with the expandasquirt companion app installed (debug build is fine),
+  paired to the Expandasquirt over BLE on the dashboard screen.
 - Phone Wi-Fi hotspot configured but **off** at the start of each cycle.
   Note the SSID and password — these are the inputs to the wizard.
 - Phone has a `.bin` ready in `Download/` from a recent
-  `arduino-cli compile --output-dir <dir> carduino-v4/` run. Bumping
+  `arduino-cli compile --output-dir <dir> expandasquirt-v4/` run. Bumping
   `FIRMWARE_VERSION` in `config.h` between cycles makes the dashboard
   banner check after reconnect a real verification.
 - USB cable from R4 to the dev workstation for serial diagnostics.
@@ -25,7 +25,7 @@ verify). Architecture in `V4X-DESIGN.md`; task spec in
 Build before bench work:
 
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi --output-dir .tmp-ota-build carduino-v4/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi --output-dir .tmp-ota-build expandasquirt-v4/
 ```
 
 ## Cycle Procedure
@@ -73,7 +73,7 @@ fingerprint.
 
 ### `maintenance_tick` time underflow on entry from BLE handler
 
-**Symptom:** wizard fails at "Carduino didn't drop BLE in time" within
+**Symptom:** wizard fails at "Expandasquirt didn't drop BLE in time" within
 8 seconds of `OK maintenance armed`. Dashboard `seq=` counter keeps
 climbing — the firmware is fine, never dropped BLE, never advanced past
 ARMED. With `MM_TRACE` on the smoking gun is:
