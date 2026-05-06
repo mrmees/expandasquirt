@@ -86,11 +86,26 @@ void loop() {
         // Temporary: print sensor readings to USB serial every 500 ms
         static unsigned long lastPrintMs = 0;
         if (now - lastPrintMs >= 500) {
-            Serial.print(F("oilT=")); Serial.print(gSensorState.oil_temp_F_x10 / 10.0f, 1);
-            Serial.print(F(" oilP=")); Serial.print(gSensorState.oil_pressure_psi_x10 / 10.0f, 1);
-            Serial.print(F(" fuelP=")); Serial.print(gSensorState.fuel_pressure_psi_x10 / 10.0f, 1);
-            Serial.print(F(" preP=")); Serial.print(gSensorState.pre_sc_pressure_kpa_x10 / 10.0f, 1);
-            Serial.print(F(" postT=")); Serial.println(gSensorState.post_sc_temp_F_x10 / 10.0f, 1);
+            Serial.print(F("oilT="));
+            Serial.print(gSensorState.oil_temp_F_x10 / 10);
+            Serial.print('.');
+            Serial.print(gSensorState.oil_temp_F_x10 % 10);
+            Serial.print(F(" oilP="));
+            Serial.print(gSensorState.oil_pressure_psi_x10 / 10);
+            Serial.print('.');
+            Serial.print(gSensorState.oil_pressure_psi_x10 % 10);
+            Serial.print(F(" fuelP="));
+            Serial.print(gSensorState.fuel_pressure_psi_x10 / 10);
+            Serial.print('.');
+            Serial.print(gSensorState.fuel_pressure_psi_x10 % 10);
+            Serial.print(F(" preP="));
+            Serial.print(gSensorState.pre_sc_pressure_kpa_x10 / 10);
+            Serial.print('.');
+            Serial.print(gSensorState.pre_sc_pressure_kpa_x10 % 10);
+            Serial.print(F(" postT="));
+            Serial.print(gSensorState.post_sc_temp_F_x10 / 10);
+            Serial.print('.');
+            Serial.println(gSensorState.post_sc_temp_F_x10 % 10);
             lastPrintMs = now;
         }
         lastSensorMs = now;

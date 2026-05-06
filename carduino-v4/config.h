@@ -31,6 +31,7 @@
 #define ADC_RESOLUTION_BITS 14
 #define ADC_MAX_COUNT       16383   // 2^14 - 1
 #define V_REF               5.0f
+#define V_REF_MV            5000
 
 // ===== Loop scheduling (Hz) =====
 #define SENSOR_HZ      100

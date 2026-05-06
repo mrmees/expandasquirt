@@ -82,8 +82,8 @@ static void format_status_line(char* out, size_t outlen) {
 static void format_sensor_line(char* out, size_t outlen, const char* label,
                                uint16_t value_x10, const char* unit, uint8_t bit) {
     bool healthy = (gSensorState.health_bitmask & bit) != 0;
-    snprintf(out, outlen, "  %-6s = %6.1f %-3s   %s",
-             label, value_x10 / 10.0f, unit,
+    snprintf(out, outlen, "  %-6s = %4u.%u %-3s   %s",
+             label, value_x10 / 10, value_x10 % 10, unit,
              healthy ? "ok" : "FAULT");
 }
 
@@ -105,16 +105,21 @@ static void cmd_status(const char* args) {
     ble_println(buf);
 
     snprintf(buf, sizeof(buf),
-             "oilT=%.1fF[%s] oilP=%.1fPSI[%s] fuelP=%.1fPSI[%s] preP=%.1fkPa[%s] postT=%.1fF[%s]",
-             gSensorState.oil_temp_F_x10 / 10.0f,
+             "oilT=%u.%uF[%s] oilP=%u.%uPSI[%s] fuelP=%u.%uPSI[%s] preP=%u.%ukPa[%s] postT=%u.%uF[%s]",
+             gSensorState.oil_temp_F_x10 / 10,
+             gSensorState.oil_temp_F_x10 % 10,
              health_label(HBIT_OIL_TEMP),
-             gSensorState.oil_pressure_psi_x10 / 10.0f,
+             gSensorState.oil_pressure_psi_x10 / 10,
+             gSensorState.oil_pressure_psi_x10 % 10,
              health_label(HBIT_OIL_PRESS),
-             gSensorState.fuel_pressure_psi_x10 / 10.0f,
+             gSensorState.fuel_pressure_psi_x10 / 10,
+             gSensorState.fuel_pressure_psi_x10 % 10,
              health_label(HBIT_FUEL_PRESS),
-             gSensorState.pre_sc_pressure_kpa_x10 / 10.0f,
+             gSensorState.pre_sc_pressure_kpa_x10 / 10,
+             gSensorState.pre_sc_pressure_kpa_x10 % 10,
              health_label(HBIT_PRE_PRESS),
-             gSensorState.post_sc_temp_F_x10 / 10.0f,
+             gSensorState.post_sc_temp_F_x10 / 10,
+             gSensorState.post_sc_temp_F_x10 % 10,
              health_label(HBIT_POST_TEMP));
     ble_println(buf);
 }
@@ -132,8 +137,8 @@ static void cmd_cal(const char* args) {
         return;
     }
     int raw = analogRead(pin);
-    float v = (raw / (float)ADC_MAX_COUNT) * V_REF;
-    snprintf(buf, sizeof(buf), "  raw=%d  voltage=%.3fV", raw, v);
+    int mv = (raw * V_REF_MV) / ADC_MAX_COUNT;
+    snprintf(buf, sizeof(buf), "  raw=%d  voltage=%d.%03dV", raw, mv / 1000, mv % 1000);
     ble_println(buf);
 }
 
