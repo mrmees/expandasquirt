@@ -93,7 +93,7 @@ static const char* health_label(uint8_t bit) {
 
 static void cmd_status(const char* args) {
     (void)args;
-    // Always emit on demand, regardless of verbose toggle.
+    // Always emit on demand.
     if (!ble_ok || !ble_client_connected()) return;
 
     char buf[160];
@@ -142,8 +142,6 @@ static void cmd_cal(const char* args) {
     ble_println(buf);
 }
 
-static bool verbose_enabled = true;
-
 static void cmd_reboot(const char* args) {
     (void)args;
     ble_println("rebooting in 1 sec...");
@@ -164,31 +162,9 @@ static void cmd_boot(const char* args) {
     ble_println(buf);
 }
 
-static void cmd_verbose(const char* args) {
-    // Presently inert for periodic dumps; retained for future summary/debug mode.
-    if (strcmp(args, "on") == 0) {
-        verbose_enabled = true;
-        ble_println("verbose on");
-    } else if (strcmp(args, "off") == 0) {
-        verbose_enabled = false;
-        ble_println("verbose off");
-    } else {
-        ble_println("usage: verbose <on|off>");
-    }
-}
-
 static void cmd_help(const char* args) {
     (void)args;
-    ble_println("commands:");
-    ble_println("  status            - one-shot sensor dump");
-    ble_println("  cal <ch>          - raw ADC + voltage (therm1|2, pres1|2|3)");
-    ble_println("  boot              - reset cause, boot count, last fatal error");
-    ble_println("  verbose on|off    - reserved for future debug-detail toggle");
-    ble_println("  reboot            - soft reset");
-    ble_println("  maintenance ...   - enter v4.x OTA mode (see V4X-DESIGN.md)");
-    ble_println("  help              - this list");
-    // More commands land as later tasks ship: log, reset can/ble,
-    // clear errors, selftest.
+    ble_println("commands: status cal boot reboot maintenance help");
 }
 
 // V4X §5.1: `maintenance ssid=<pct> psk=<pct> pwd=<pct>` enters MM_ARMED;
@@ -239,7 +215,6 @@ bool ble_init() {
     ble_register_command("cal",         cmd_cal);
     ble_register_command("boot",        cmd_boot);
     ble_register_command("reboot",      cmd_reboot);
-    ble_register_command("verbose",     cmd_verbose);
     ble_register_command("maintenance", cmd_maintenance);
     ble_register_command("help",        cmd_help);
 
