@@ -75,7 +75,7 @@ TBD — populated when implementation lands.
 
 ## Build
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 ## Flash
@@ -347,7 +347,7 @@ void loop() {
 - [ ] **Step 5: Compile to verify it builds**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 Expected: clean compile, no errors. Output ends with sketch size statistics.
@@ -965,7 +965,7 @@ if (now - lastPrintMs >= 500) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 Expected: clean compile.
@@ -1096,7 +1096,7 @@ if (!can_protocol_init()) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 - [ ] **Step 5: 🔧 Bench-verify**
@@ -1338,7 +1338,7 @@ CanSendPhase();
 - [ ] **Step 3: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 - [ ] **Step 4: 🔧 Bench-verify with USB-CAN dongle**
@@ -2065,7 +2065,7 @@ if (channel_health_update(&h_oil_temp, ..., &flat_oil_temp, now, eng))   mask |=
 
 ```bash
 ./tests/run-tests.sh
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 - [ ] **Step 8: Commit**
@@ -2905,7 +2905,7 @@ void persistent_record_boot(ResetCause cause) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 - [ ] **Step 5: Commit**
@@ -4132,7 +4132,7 @@ See `DESIGN.md` for the full spec, `IMPLEMENTATION-PLAN.md` for the build plan.
 
 ## Build
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 ## Flash (USB)

@@ -13,8 +13,8 @@ android {
         applicationId = "works.mees.expandasquirt"
         minSdk = 26          // Android 8.0 — WifiManager.startLocalOnlyHotspot() base API
         targetSdk = 36       // Android 16 — startLocalOnlyHotspotWithConfiguration (forced WPA2 for OTA)
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildFeatures {

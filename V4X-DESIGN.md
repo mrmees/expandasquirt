@@ -249,7 +249,7 @@ Estimated total: ~10 KB. v4 baseline is 104,880 bytes / 128 KB max — gives us 
 
 ## 6. OTA wire protocol summary
 
-Pure HTTP `POST /sketch HTTP/1.1` to port 65280. Headers: `Authorization: Basic base64("arduino:<otapw>")`, `Content-Length`, `Content-Type: application/octet-stream`. Body: raw `.bin` from `arduino-cli compile`. No `.ota` container, no LZSS, no chunked transfer. Server replies 200 / 401 / 413 / 414 / 500. Full protocol notes in `prototypes/ota_arduinoota/notes-protocol.md`.
+Pure HTTP `POST /sketch HTTP/1.1` to port 65280. Headers: `Authorization: Basic base64("arduino:<otapw>")`, `Content-Length`, `Content-Type: application/octet-stream`. Body: raw `.bin` from `arduino-cli compile --library libraries/ArduinoBLE`. No `.ota` container, no LZSS, no chunked transfer. Server replies 200 / 401 / 413 / 414 / 500. Full protocol notes in `prototypes/ota_arduinoota/notes-protocol.md`.
 
 ---
 
@@ -322,7 +322,7 @@ Task 75 (BLE-reconnect timing tune) is gated on the first real OTA cycle produci
 - **R4 mDNS responder works in STA mode on phone hotspot.** JAndrassy's default `ArduinoOTAMdnsClass` global registers it; depends on `WiFiUDP::beginMulticast` reaching the modem properly. Not directly verified yet — Task 53 bench couldn't browse mDNS post-reboot since the rebooted test-sketch lacks WiFi. Verify during Task 71/72 implementation when the production app does the lookup.
 - **`NsdManager` resolves `_arduino._tcp` services on the hotspot subnet** — multicast propagates out all interfaces by default; verified during Task 77 bench.
 - **Bootloader-force procedure on Matthew's R4 clone.** Double-tap reset to enter the BOSSA bootloader is the standard Arduino-OEM procedure; clone behavior may differ. Verify before shipping the USB-rescue screen.
-- **Sketch size after firmware additions.** Estimated ~10 KB, ~13 KB headroom. Verify post-implementation with `arduino-cli compile` size output. If we overflow, candidates to cut: compact debug strings in `self_tests.cpp`, drop the unused `verbose` command, defer the maintenance LED patterns to a v4.y polish pass.
+- **Sketch size after firmware additions.** Estimated ~10 KB, ~13 KB headroom. Verify post-implementation with `arduino-cli compile --library libraries/ArduinoBLE` size output. If we overflow, candidates to cut: compact debug strings in `self_tests.cpp`, drop the unused `verbose` command, defer the maintenance LED patterns to a v4.y polish pass.
 - **Banner format compatibility.** Adding `version=` line is technically a change to the BLE banner output; existing clients (nRF Connect, etc.) won't care, but worth a quick visual check that `Serial Bluetooth Terminal` still renders cleanly.
 
 ### 11.1 Development-environment notes (from Phase L bench)

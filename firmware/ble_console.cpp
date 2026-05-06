@@ -6,17 +6,9 @@
 #include "sensor_pipeline.h"
 #include "maintenance_args.h"
 #include "maintenance_mode.h"
-#include <ArduinoBLE.h>
+#include <bleperi.h>
 #include <stdio.h>
 #include <string.h>
-
-static BLEService nus_service(BLE_SERVICE_UUID);
-static BLECharacteristic tx_char(BLE_TX_CHAR_UUID, BLENotify, 20);
-// rx_char max length matches BLE_RX_BUFFER_SIZE so the v4.x maintenance command
-// (long percent-encoded line) fits in a single ATT write at higher MTUs.
-// Lower-MTU clients still get split-and-reassemble via the BleServicePhase
-// accumulator, which has always handled multi-packet writes.
-static BLECharacteristic rx_char(BLE_RX_CHAR_UUID, BLEWriteWithoutResponse | BLEWrite, BLE_RX_BUFFER_SIZE);
 
 static bool ble_ok = false;
 static bool was_connected = false;
@@ -151,14 +143,15 @@ static void cmd_reboot(const char* args) {
 
 static void cmd_boot(const char* args) {
     (void)args;
-    char buf[64];
+    char buf[96];
     const PersistentState* s = persistent_get();
     const char* cause_names[] = {
         "UNKNOWN", "POWER_ON", "WATCHDOG", "BROWNOUT", "SOFT_RESET"
     };
     int idx = (s->last_reset_cause <= 4) ? s->last_reset_cause : 0;
-    snprintf(buf, sizeof(buf), "boot=%u reset=%s last_err=%u",
-             s->boot_counter, cause_names[idx], s->last_fatal_err);
+    snprintf(buf, sizeof(buf), "boot=%u reset=%s last_err=%u fw=%s build=%s",
+             s->boot_counter, cause_names[idx], s->last_fatal_err,
+             FIRMWARE_VERSION, FIRMWARE_BUILD);
     ble_println(buf);
 }
 
@@ -198,18 +191,10 @@ static void cmd_maintenance(const char* args) {
 }
 
 bool ble_init() {
-    if (!BLE.begin()) {
-        Serial.println(F("BLE.begin() failed"));
+    if (!bleperi::begin(BLE_DEVICE_NAME)) {
+        Serial.println(F("bleperi::begin() failed"));
         return false;
     }
-
-    BLE.setDeviceName(BLE_DEVICE_NAME);
-    BLE.setLocalName(BLE_DEVICE_NAME);
-    BLE.setAdvertisedService(nus_service);
-
-    nus_service.addCharacteristic(tx_char);
-    nus_service.addCharacteristic(rx_char);
-    BLE.addService(nus_service);
 
     ble_register_command("status",      cmd_status);
     ble_register_command("cal",         cmd_cal);
@@ -218,7 +203,6 @@ bool ble_init() {
     ble_register_command("maintenance", cmd_maintenance);
     ble_register_command("help",        cmd_help);
 
-    BLE.advertise();
     ble_ok = true;
     Serial.println(F("BLE advertising as " BLE_DEVICE_NAME));
     return true;
@@ -226,7 +210,7 @@ bool ble_init() {
 
 void BleServicePhase() {
     if (!ble_ok) return;
-    BLE.poll();
+    bleperi::poll();
 
     bool now_connected = ble_client_connected();
     if (now_connected && !was_connected) {
@@ -240,22 +224,20 @@ void BleServicePhase() {
         ble_println("type 'help' for commands");
     }
 
-    if (rx_char.written()) {
-        size_t n = rx_char.valueLength();
-        const uint8_t* data = rx_char.value();
-        for (size_t i = 0; i < n; i++) {
-            char c = (char)data[i];
-            if (c == '\r') continue;
-            if (c == '\n') {
-                rx_buf[rx_len] = 0;
-                if (rx_len > 0) process_command(rx_buf);
-                rx_len = 0;
-            } else if (rx_len < BLE_RX_BUFFER_SIZE - 1) {
-                rx_buf[rx_len++] = c;
-            } else {
-                rx_len = 0;
-                ble_println("input buffer overflow");
-            }
+    uint8_t data[BLE_RX_BUFFER_SIZE];
+    size_t n = bleperi::read_available(CHAR_NUS_RX, data, sizeof(data));
+    for (size_t i = 0; i < n; i++) {
+        char c = (char)data[i];
+        if (c == '\r') continue;
+        if (c == '\n') {
+            rx_buf[rx_len] = 0;
+            if (rx_len > 0) process_command(rx_buf);
+            rx_len = 0;
+        } else if (rx_len < BLE_RX_BUFFER_SIZE - 1) {
+            rx_buf[rx_len++] = c;
+        } else {
+            rx_len = 0;
+            ble_println("input buffer overflow");
         }
     }
 
@@ -263,30 +245,33 @@ void BleServicePhase() {
 }
 
 bool ble_client_connected() {
-    return BLE.central().connected();
+    return bleperi::connected();
 }
 
 void ble_end() {
     if (!ble_ok) return;
-    BLE.disconnect();
-    BLE.stopAdvertise();
-    BLE.end();
+    bleperi::end();
     ble_ok = false;
 }
 
 void ble_println(const char* msg) {
     if (!ble_ok || !ble_client_connected()) return;
 
+    uint16_t mtu = bleperi::current_mtu();
+    size_t payload_mtu = (mtu > BLEPERI_ATT_HEADER_SIZE)
+        ? (size_t)(mtu - BLEPERI_ATT_HEADER_SIZE)
+        : (size_t)(BLEPERI_DEFAULT_ATT_MTU - BLEPERI_ATT_HEADER_SIZE);
+
     size_t len = strlen(msg);
     while (len > 0) {
-        size_t chunk = (len > 19) ? 19 : len;
-        tx_char.writeValue((const uint8_t*)msg, chunk);
+        size_t chunk = (len > payload_mtu) ? payload_mtu : len;
+        bleperi::notify(CHAR_NUS_TX, (const uint8_t*)msg, chunk);
         msg += chunk;
         len -= chunk;
     }
 
     const char* eol = "\r\n";
-    tx_char.writeValue((const uint8_t*)eol, 2);
+    bleperi::notify(CHAR_NUS_TX, (const uint8_t*)eol, 2);
 }
 
 // Internal dump body. Caller is responsible for connection gating.
