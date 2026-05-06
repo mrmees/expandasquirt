@@ -23,7 +23,7 @@ wiring details.
 
 Plain build (FIRMWARE_BUILD = "unknown"):
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi --library libraries/ArduinoBLE firmware/
 ```
 
 Build with git-sha stamp (recommended for any build that may be OTA-pushed —
@@ -33,6 +33,7 @@ which firmware is running post-update; per V4X-DESIGN.md §5.2):
 GIT_SHA=$(git rev-parse --short HEAD)
 "/c/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
+    --library libraries/ArduinoBLE \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=$GIT_SHA" \
     firmware/
 ```
