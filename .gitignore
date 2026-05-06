@@ -35,6 +35,9 @@ HANDOFF.md
 # Brainstorm/visual companion artifacts (transient session content)
 .superpowers/
 
+# Claude Code worktrees + per-project state
+.claude/
+
 # Bench session scratch (screenshots, capture logs, compiled .bin caches)
 .tmp-*
 
