@@ -31,6 +31,9 @@ import works.mees.carduino.ui.DashboardViewModel
 import works.mees.carduino.ui.DevicePickerScreen
 import works.mees.carduino.ui.DiagnosticsScreen
 import works.mees.carduino.ui.DiagnosticsViewModel
+import works.mees.carduino.ui.HotspotSetupViewModel
+import works.mees.carduino.ui.OtaViewModel
+import works.mees.carduino.ui.OtaWizardScreen
 import works.mees.carduino.ui.PermissionsGate
 
 /**
@@ -116,7 +119,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 DashboardScreen(
                                     vm = dashboardViewModel,
-                                    onMenuFirmwareUpdate = {},
+                                    onMenuFirmwareUpdate = { nav.navigate("ota") },
                                     onMenuDiagnostics = { nav.navigate("diag") },
                                     onForget = {
                                         dashboardViewModel.forgetCurrent()
@@ -149,6 +152,51 @@ class MainActivity : ComponentActivity() {
                                 DiagnosticsScreen(
                                     vm = diagVm,
                                     onBack = { nav.popBackStack() },
+                                )
+                            }
+                            composable("ota") {
+                                val otaVm: OtaViewModel = viewModel(
+                                    factory = object : ViewModelProvider.Factory {
+                                        @Suppress("UNCHECKED_CAST")
+                                        override fun <T : ViewModel> create(
+                                            modelClass: Class<T>,
+                                        ): T {
+                                            if (
+                                                modelClass.isAssignableFrom(
+                                                    OtaViewModel::class.java,
+                                                )
+                                            ) {
+                                                return OtaViewModel(ble, store) as T
+                                            }
+                                            throw IllegalArgumentException(
+                                                "Unknown ViewModel class: ${modelClass.name}",
+                                            )
+                                        }
+                                    },
+                                )
+                                val hotspotVm: HotspotSetupViewModel = viewModel(
+                                    factory = object : ViewModelProvider.Factory {
+                                        @Suppress("UNCHECKED_CAST")
+                                        override fun <T : ViewModel> create(
+                                            modelClass: Class<T>,
+                                        ): T {
+                                            if (
+                                                modelClass.isAssignableFrom(
+                                                    HotspotSetupViewModel::class.java,
+                                                )
+                                            ) {
+                                                return HotspotSetupViewModel(store) as T
+                                            }
+                                            throw IllegalArgumentException(
+                                                "Unknown ViewModel class: ${modelClass.name}",
+                                            )
+                                        }
+                                    },
+                                )
+                                OtaWizardScreen(
+                                    otaVm = otaVm,
+                                    hotspotVm = hotspotVm,
+                                    onExit = { nav.popBackStack() },
                                 )
                             }
                         }
