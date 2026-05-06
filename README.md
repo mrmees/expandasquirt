@@ -1,6 +1,6 @@
-# EXPANDASQUIRT v4
+# EXPANDASQUIRT
 
-EXPANDASQUIRT v4 is a sensor adapter for an MS3Pro PNP on a 2000 NB1 Miata. It reads
+EXPANDASQUIRT is a sensor adapter for an MS3Pro PNP on a 2000 NB1 Miata. It reads
 five aftermarket analog sensors on an Uno R4 WiFi-class board, converts them to
 engineering units, and broadcasts them to MS3 over CAN at 10 Hz.
 
@@ -27,7 +27,7 @@ Plain build (FIRMWARE_BUILD = "unknown"):
 ```
 
 Build with git-sha stamp (recommended for any build that may be OTA-pushed —
-the BLE banner exposes `FIRMWARE_BUILD` so the v4.x companion app can verify
+the BLE banner exposes `FIRMWARE_BUILD` so the companion app can verify
 which firmware is running post-update; per V4X-DESIGN.md §5.2):
 ```bash
 GIT_SHA=$(git rev-parse --short HEAD)
@@ -41,7 +41,7 @@ Pinned board and library versions are listed in [libraries.txt](libraries.txt).
 
 ## Flash
 
-v4 firmware can be updated either over USB or wirelessly via the v4.x companion app.
+Firmware can be updated either over USB or wirelessly via the companion app.
 
 **USB:**
 
@@ -51,12 +51,12 @@ v4 firmware can be updated either over USB or wirelessly via the v4.x companion 
 
 Replace `COM<N>` with the R4 serial port.
 
-**Wireless (v4.x companion app):** The Android app pushes a `.bin` over the
+**Wireless (via the companion app):** The Android app pushes a `.bin` over the
 user's phone hotspot via the JAndrassy/ArduinoOTA library (1.1.1). See
-`V4X-DESIGN.md` for the design and the **v4.x companion Android app** section
+`V4X-DESIGN.md` for the design and the **Companion Android app** section
 below for setup.
 
-## v4.x companion Android app
+## Companion Android app
 
 Live BLE sensor dashboard + diagnostic actions + wireless OTA wizard. Source
 under `app/`. The app is sideloaded — there's no Play Store distribution.
@@ -104,13 +104,21 @@ Bench-side validation is documented in
 - [V4X-DESIGN.md](V4X-DESIGN.md) - companion Android app + maintenance-mode
   design (supersedes DESIGN.md §6.4.3).
 - [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) - task-by-task build plan
-  (Phases A-K cover v4; Phases L-P cover v4.x companion app + OTA).
+  (Phases A-K cover the base firmware; Phases L-P cover the companion app and
+  wireless OTA).
 - [docs/wiring-diagram.md](docs/wiring-diagram.md) - power tree, pinout,
   sensor wiring, ADC filtering, and CAN shield notes.
 - [docs/tunerstudio-setup.md](docs/tunerstudio-setup.md) - MS3/TunerStudio CAN
   Receiving and Generic Sensor Input setup.
 - [docs/bench-test-procedures.md](docs/bench-test-procedures.md) - Phase 1
   bench test setup, steps, and pass criteria.
+
+## History
+
+Originally prototyped under the name **carduino** through several hardware
+iterations (Uno R3 + bare MCP2515 → Uno R4 + EF02037 shield). Those carduino
+iterations were prototype-grade work and are not maintained as a release
+lineage. **EXPANDASQUIRT v1.0** is the first proper release.
 
 ## License
 
