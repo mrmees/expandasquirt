@@ -7223,27 +7223,11 @@ git commit -m "tune: post-apply verify timing based on bench measurement"
 
 ✅ **SHIPPED 2026-05-05** in commit `37c5da2`. Files: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`, plus nav wiring in `MainActivity.kt`, button row in `DiagnosticsScreen.kt`, callback prop on `OtaWizardScreen.kt`.
 
-The bootloader-force procedure on Matthew's specific R4 clone hasn't been bench-verified yet — the screen documents the standard Arduino procedure (double-tap reset → yellow LED pulses → arduino-cli upload). If the clone differs at bench, update the screen's footer note and `docs/bench-test-procedures.md`.
+The screen documents the standard Arduino R4 procedure (double-tap reset → yellow LED pulses → arduino-cli upload). The original plan included a bench-verification step for the bootloader-force fallback on Matthew's specific R4 clone (in case the clone differs from the official board). That step was dropped 2026-05-06: the failure mode it covers (a sketch so broken it hangs USB enumeration before bootloader handshake) is implausible for any firmware that compiles and passes the boot self-tests, and standard `arduino-cli upload` is the recovery path that would actually be used. If the clone ever does turn out to differ at bench, update the screen's footer note and `docs/bench-test-procedures.md`.
 
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`
 - Modify: `docs/bench-test-procedures.md` (add bootloader-force section)
-
-- [ ] **Step 1: Verify the bootloader-force procedure on Matthew's R4 clone**
-
-V4X-DESIGN.md §11 calls this out: the standard Arduino-OEM procedure is "double-tap reset to enter BOSSA mode," but R4 clones may differ. Before writing the rescue screen, prove the procedure works:
-
-1. Flash a deliberately-broken sketch (e.g., one with `while(true) {}` in setup blocking USB enumeration) via USB to put the device in a "stuck" state where normal upload fails.
-2. Try the recovery procedure — double-tap reset.
-3. Watch for the bootloader's distinctive yellow LED pulse.
-4. Run `arduino-cli upload` to recover with the production firmware.
-5. Document in `docs/bench-test-procedures.md`:
-   - Exact button sequence that worked (double-tap timing, hold duration, etc.)
-   - Visible LED indication that bootloader mode is active
-   - Whether `arduino-cli` reconnects automatically or needs the COM port re-specified
-   - Any clone-specific quirks
-
-The text in the rescue screen (Step 2 below) must match what was actually verified.
 
 - [ ] **Step 2: Bundled instructions (use real verified procedure)**
 
