@@ -41,7 +41,9 @@ Pinned board and library versions are listed in [libraries.txt](libraries.txt).
 
 ## Flash
 
-v4 firmware updates are USB-only:
+v4 firmware can be updated either over USB or wirelessly via the v4.x companion app.
+
+**USB:**
 
 ```powershell
 & "C:\Program Files\Arduino CLI\arduino-cli.exe" upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> carduino-v4/
@@ -49,11 +51,40 @@ v4 firmware updates are USB-only:
 
 Replace `COM<N>` with the R4 serial port.
 
-Wireless firmware updates are deferred to v4.x. The v4.x design and
-implementation plan add an Android companion app + firmware-side maintenance
-state machine that uses the JAndrassy/ArduinoOTA library (1.1.1) for the
-HTTP-push-over-WiFi apply step. See `V4X-DESIGN.md` for the architecture and
-`IMPLEMENTATION-PLAN.md` Phases L-P for the task breakdown.
+**Wireless (v4.x companion app):** The Android app pushes a `.bin` over the
+user's phone hotspot via the JAndrassy/ArduinoOTA library (1.1.1). See
+`V4X-DESIGN.md` for the design and the **v4.x companion Android app** section
+below for setup.
+
+## v4.x companion Android app
+
+Live BLE sensor dashboard + diagnostic actions + wireless OTA wizard. Source
+under `app/`. The app is sideloaded — there's no Play Store distribution.
+
+**Build the debug APK:**
+```bash
+./gradlew :app:assembleDebug
+```
+
+The APK lands at `app/build/outputs/apk/debug/app-debug.apk`.
+
+**Install on a paired Android phone:**
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n works.mees.carduino/.MainActivity
+```
+
+**Features:**
+- Live BLE dashboard for all five sensors with health indicators
+- Diagnostic actions: status dump, boot info, help, reboot, USB rescue
+- Wireless firmware updates via a manual-hotspot OTA wizard (user toggles their
+  phone hotspot configured as WPA2-Personal; the app pushes the `.bin` over it
+  via mDNS-resolved HTTP). The R4 modem firmware 0.6.0 cannot reliably join
+  WPA3 / WPA2-WPA3-Transition APs, so the hotspot must be WPA2-Personal.
+- Hotspot credentials are persisted in DataStore; first-run can import them
+  from a Wi-Fi QR screenshot.
+
+**Min SDK 26 (Android 8.0). Target SDK 36 (Android 16).**
 
 ## Tests
 

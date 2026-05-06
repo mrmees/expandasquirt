@@ -7462,7 +7462,7 @@ After writing the v4.x phases, I checked them against the spec at `V4X-DESIGN.md
   - §4.1 four screens — Tasks 66 (dashboard), 67 (picker), 69 (diagnostics), 74 (OTA wizard), 76 (USB rescue)
   - §4.2 persistence — Task 67 (DataStore + KnownDevice schema)
   - §4.3 BLE central — Tasks 64 (client), 65 (parser), 68 (autoreconnect)
-  - §4.4 LOH lifecycle — Task 71
+  - §4.4 manual hotspot lifecycle — Task 71
   - §4.5 OTA HTTP push — Task 73
   - §5.1 new BLE commands — Task 58 (parser + dispatch)
   - §5.2 banner version token — Task 59
@@ -7470,12 +7470,12 @@ After writing the v4.x phases, I checked them against the spec at `V4X-DESIGN.md
   - §5.4 final CAN status frame — Task 60
   - §5.5 no new EEPROM records — implicit (no task touches persistence)
   - §6 OTA wire protocol — Task 73 implements client side; Task 53 verifies server side
-  - §7 failure modes — covered in Tasks 70 (size), 71 (LOH fail), 72 (mDNS timeout), 73 (HTTP errors), 74 (orchestrated failure paths)
+  - §7 failure modes — covered in Tasks 70 (size), 71 (hotspot setup + Network capture), 72 (mDNS timeout), 73 (HTTP errors), 74 (orchestrated failure paths)
   - §8 USB rescue — Task 76
   - §11 open verification items — Phase L (bench prototypes) covers the main two; remaining items are flagged in individual tasks
 - **Phase J supersession** — explicit Task 79 cleanup.
 - **Placeholder scan:** all steps have actual code or commands. A few intentional placeholders for actual measured values (Task 53 step 9 results template, Task 75 timing tuning) — these are deliberate and noted as "fill in real values" in context.
-- **Type consistency:** `MaintenanceArgs`, `MMState`, `BleState`, `DumpFrame`, `SensorReading`, `KnownDevice`, `LohSession`, `OtaStep`, `OtaResult`, `SizeCheck` consistent across tasks that reference them.
+- **Type consistency:** `MaintenanceArgs`, `MMState`, `BleState`, `DumpFrame`, `SensorReading`, `KnownDevice`, `CarduinoEndpoint`, `OtaStep`, `OtaResult`, `SizeCheck` consistent across tasks that reference them.
 - **Granularity:** 28 tasks across 5 phases. Phase L (3) gates the rest. Phases M-N-O are sequential within phase but Phases N and M can proceed in parallel after L. Phase P is final integration.
 - **Dependencies:**
   - Phase L → blocks Phase M, N, O
@@ -7495,7 +7495,7 @@ Estimated 28 tasks, 5-7 weekends of work for someone doing this part-time. Bench
 
 After the initial draft, codex did a critical pass and found 11 must-fix issues + 1 trim opportunity. All were addressed inline:
 
-1. **Task 71** now captures the LOH `Network` via `ConnectivityManager.NetworkCallback` registered before `startLocalOnlyHotspot`. `LohSession.network` is non-nullable.
+1. **Task 71** now captures the LOH `Network` via `ConnectivityManager.NetworkCallback` registered before `startLocalOnlyHotspot`. `LohSession.network` is non-nullable. (superseded by Plan C — see SHIPPED block in Task 71)
 2. **Task 72** scopes mDNS to the LOH network — uses API 33+ `DiscoveryRequest.Builder().setNetwork()` on modern Android, falls back to `bindProcessToNetwork` on older.
 3. **Task 64** serializes BLE writes through `onCharacteristicWrite` callback via `LinkedBlockingQueue`. Negotiated MTU is read from `onMtuChanged`; client requests 247-byte MTU after service discovery.
 4. **Task 74** waits for `OK maintenance ...` BLE reply before delaying. ERR replies surface clean error messages.

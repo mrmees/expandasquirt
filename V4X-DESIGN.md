@@ -301,20 +301,19 @@ Reachable from: the OTA wizard's failure dead-end, AND the diagnostic actions sc
 
 ---
 
-## 10. Implementation phasing (rough)
+## 10. Implementation phasing (completed)
 
-Detailed plan is for the next stage (writing-plans). High-level shape:
+Phases L-P in `IMPLEMENTATION-PLAN.md` are the executable build plan; Phase J is superseded.
 
-1. **Bench prototype: prove R4 `WiFiServer` accepts on phone hotspot.** Standalone sketch that calls `ArduinoOTA.begin(...)` against Matthew's S25+ hotspot, push a test sketch from a laptop on the same network with `curl`. Gate on this passing before app implementation begins.
-2. **Bench prototype: prove Android phone-hotspot Network capture + OkHttp routes correctly.** Minimal Android app that opens hotspot settings, captures the phone hotspot `Network`, and verifies a bound OkHttp request routes through it. Verify the Pixel 8 `NetworkCallback` filter.
-3. **Firmware: maintenance state machine + new BLE commands + banner version token + ArduinoOTA integration.**
-4. **App: BLE central + live dashboard (Layout B).**
-5. **App: device picker + persistence.**
-6. **App: diagnostic actions screen.**
-7. **App: OTA wizard + manual-hotspot integration.**
-8. **App: USB rescue screen.**
-9. **End-to-end integration test: real OTA push from app to device, including failure paths.**
-10. **Stale-content cleanup:** rewrite `IMPLEMENTATION-PLAN.md` Phase J to match this design; update `DESIGN.md` §6.4.3 to point to this doc instead of "future scope."
+| Phase | Tasks | Status | What |
+|---|---|---|---|
+| L | 53-55 | ✅ done | Bench prototypes — R4 ArduinoOTA listener verified on phone hotspot |
+| M | 56-62 | ✅ done | Firmware additions — maintenance state machine, BLE commands, banner version, CAN status frame, LED maintenance patterns |
+| N | 63-69 | ✅ done | Android app foundation — Compose scaffolding, BLE central, dashboard, picker, autoreconnect, diagnostics |
+| O | 70-76 | ✅ done (75 deferred to first-OTA bench data) | OTA wizard — file picker, manual hotspot, mDNS, HTTP push, wizard, USB rescue |
+| P | 77-80 | ⏳ in-progress | End-to-end bench + in-car validation, doc cleanup |
+
+Task 75 (BLE-reconnect timing tune) is gated on the first real OTA cycle producing measured timings. Task 77 (bench E2E) and Task 78 (in-car E2E) require real bench/in-car runs.
 
 ---
 
