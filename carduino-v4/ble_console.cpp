@@ -40,7 +40,7 @@ static constexpr uint8_t HBIT_OIL_PRESS  = 0x04;
 static constexpr uint8_t HBIT_FUEL_PRESS = 0x08;
 static constexpr uint8_t HBIT_PRE_PRESS  = 0x10;
 
-// Forward decl: definition is below BleDumpPhase, but cmd_status calls it.
+// Forward decl: definition is below BleDumpPhase.
 static void do_sensor_dump();
 
 void ble_register_command(const char* name, CommandHandler h) {
@@ -87,11 +87,36 @@ static void format_sensor_line(char* out, size_t outlen, const char* label,
              healthy ? "ok" : "FAULT");
 }
 
+static const char* health_label(uint8_t bit) {
+    return (gSensorState.health_bitmask & bit) != 0 ? "ok" : "FAULT";
+}
+
 static void cmd_status(const char* args) {
     (void)args;
     // Always emit on demand, regardless of verbose toggle.
     if (!ble_ok || !ble_client_connected()) return;
-    do_sensor_dump();
+
+    char buf[160];
+    snprintf(buf, sizeof(buf),
+             "status: seq=%u ready=%u health=0x%02X",
+             gSensorState.sequence_counter,
+             gSensorState.ready_flag,
+             gSensorState.health_bitmask);
+    ble_println(buf);
+
+    snprintf(buf, sizeof(buf),
+             "oilT=%.1fF[%s] oilP=%.1fPSI[%s] fuelP=%.1fPSI[%s] preP=%.1fkPa[%s] postT=%.1fF[%s]",
+             gSensorState.oil_temp_F_x10 / 10.0f,
+             health_label(HBIT_OIL_TEMP),
+             gSensorState.oil_pressure_psi_x10 / 10.0f,
+             health_label(HBIT_OIL_PRESS),
+             gSensorState.fuel_pressure_psi_x10 / 10.0f,
+             health_label(HBIT_FUEL_PRESS),
+             gSensorState.pre_sc_pressure_kpa_x10 / 10.0f,
+             health_label(HBIT_PRE_PRESS),
+             gSensorState.post_sc_temp_F_x10 / 10.0f,
+             health_label(HBIT_POST_TEMP));
+    ble_println(buf);
 }
 
 static void cmd_cal(const char* args) {
