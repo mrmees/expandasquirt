@@ -143,14 +143,15 @@ static void cmd_reboot(const char* args) {
 
 static void cmd_boot(const char* args) {
     (void)args;
-    char buf[64];
+    char buf[96];
     const PersistentState* s = persistent_get();
     const char* cause_names[] = {
         "UNKNOWN", "POWER_ON", "WATCHDOG", "BROWNOUT", "SOFT_RESET"
     };
     int idx = (s->last_reset_cause <= 4) ? s->last_reset_cause : 0;
-    snprintf(buf, sizeof(buf), "boot=%u reset=%s last_err=%u",
-             s->boot_counter, cause_names[idx], s->last_fatal_err);
+    snprintf(buf, sizeof(buf), "boot=%u reset=%s last_err=%u fw=%s build=%s",
+             s->boot_counter, cause_names[idx], s->last_fatal_err,
+             FIRMWARE_VERSION, FIRMWARE_BUILD);
     ble_println(buf);
 }
 
