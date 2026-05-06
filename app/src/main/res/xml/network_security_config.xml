@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+        The app's only HTTP traffic is the OTA firmware POST to the R4's
+        ArduinoOTA listener on a phone-hosted hotspot. Android network security
+        config cannot express CIDR subnet allowlists, and hotspot device IPs vary
+        across Android/OEM tethering implementations, so cleartext is allowed at
+        the app policy level intentionally.
+    -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
