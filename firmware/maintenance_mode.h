@@ -1,4 +1,4 @@
-// expandasquirt-v4/maintenance_mode.h — state machine for v4.x maintenance/OTA mode.
+// firmware/maintenance_mode.h — state machine for v4.x maintenance/OTA mode.
 //
 // Real implementation lands in Task 61. This header declares the API the BLE
 // dispatcher (Task 58 step 5) and main loop call into; Task 61 replaces the

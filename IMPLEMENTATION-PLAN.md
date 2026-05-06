@@ -17,7 +17,7 @@
 - **🔧 Bench-verified:** Hardware-dependent, standalone sketch in `prototypes/` with documented expected outcome (USB-CAN dongle output, voltmeter reading, BLE app behavior)
 - **🚗 In-car-verified:** Full system test, drive cycle datalog or post-install procedure
 
-**Files:** Paths are relative to `projects/expandasquirt-v4/` unless otherwise noted.
+**Files:** Paths are relative to `projects/expandasquirt/` unless otherwise noted.
 
 **Commits:** Each task ends with a git commit. Commit messages follow `<type>: <description>` format (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`).
 
@@ -75,12 +75,12 @@ TBD — populated when implementation lands.
 
 ## Build
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 ## Flash
 ```bash
-arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/
+arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> firmware/
 ```
 ```
 
@@ -175,8 +175,8 @@ git commit -m "chore: pin toolchain and library versions"
 ### Task 3: Sketch skeleton with super-loop dispatcher
 
 **Files:**
-- Create: `expandasquirt-v4/expandasquirt-v4.ino`
-- Create: `expandasquirt-v4/config.h`
+- Create: `firmware/firmware.ino`
+- Create: `firmware/config.h`
 - Create: `secrets.h.template`
 
 - [ ] **Step 1: Create `secrets.h.template`**
@@ -200,7 +200,7 @@ cp secrets.h.template secrets.h
 
 Edit `secrets.h` to set `AP_PASSWORD` to your chosen value.
 
-- [ ] **Step 3: Create `expandasquirt-v4/config.h` with all design-doc constants**
+- [ ] **Step 3: Create `firmware/config.h` with all design-doc constants**
 
 ```c
 #ifndef CONFIG_H
@@ -274,7 +274,7 @@ Edit `secrets.h` to set `AP_PASSWORD` to your chosen value.
 #define ENGINE_RUNNING_OIL_PSI 5
 
 // ===== BLE =====
-#define BLE_DEVICE_NAME       "EXPANDASQUIRT-v4"
+#define BLE_DEVICE_NAME       "EXPANDASQUIRT"
 #define BLE_SERVICE_UUID      "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_TX_CHAR_UUID      "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_CHAR_UUID      "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -288,7 +288,7 @@ Edit `secrets.h` to set `AP_PASSWORD` to your chosen value.
 #endif
 ```
 
-- [ ] **Step 4: Create `expandasquirt-v4/expandasquirt-v4.ino` skeleton**
+- [ ] **Step 4: Create `firmware/firmware.ino` skeleton**
 
 ```c
 #include "config.h"
@@ -304,7 +304,7 @@ void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 3000) { /* wait briefly for USB */ }
 
-    Serial.println(F("EXPANDASQUIRT v4 booting..."));
+    Serial.println(F("EXPANDASQUIRT booting..."));
 
     analogReadResolution(ADC_RESOLUTION_BITS);
 
@@ -347,7 +347,7 @@ void loop() {
 - [ ] **Step 5: Compile to verify it builds**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 Expected: clean compile, no errors. Output ends with sketch size statistics.
@@ -355,7 +355,7 @@ Expected: clean compile, no errors. Output ends with sketch size statistics.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/ secrets.h.template
+git add firmware/ secrets.h.template
 git commit -m "feat: super-loop skeleton with config.h"
 ```
 
@@ -452,7 +452,7 @@ int main() {
 #!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
-g++ -std=c++17 -Wall -Wextra -I. -I../expandasquirt-v4 test_main.cpp -o test_runner
+g++ -std=c++17 -Wall -Wextra -I. -I../firmware test_main.cpp -o test_runner
 ./test_runner
 ```
 
@@ -488,8 +488,8 @@ git commit -m "test: host-side test harness with assert macros"
 ### Task 5: Steinhart-Hart thermistor conversion + tests
 
 **Files:**
-- Create: `expandasquirt-v4/sensor_pipeline.h`
-- Create: `expandasquirt-v4/sensor_pipeline.cpp`
+- Create: `firmware/sensor_pipeline.h`
+- Create: `firmware/sensor_pipeline.cpp`
 - Create: `tests/test_sensor_pipeline.cpp`
 - Modify: `tests/test_main.cpp`
 
@@ -544,7 +544,7 @@ with:
 
 Expected: linker error — `thermistor_to_F` undefined.
 
-- [ ] **Step 4: Create `expandasquirt-v4/sensor_pipeline.h`**
+- [ ] **Step 4: Create `firmware/sensor_pipeline.h`**
 
 ```c
 #ifndef SENSOR_PIPELINE_H
@@ -585,7 +585,7 @@ the matching definition in the `.cpp` has C linkage so symbols line up
 at link time. Apply this same idiom to `can_protocol.h`, `sensor_health.h`,
 etc. as they're added.
 
-- [ ] **Step 5: Create `expandasquirt-v4/sensor_pipeline.cpp` with thermistor function**
+- [ ] **Step 5: Create `firmware/sensor_pipeline.cpp` with thermistor function**
 
 ```c
 #include "sensor_pipeline.h"
@@ -620,8 +620,8 @@ Note: `pressure_psi` and `bosch_kpa` are stubs at this point so the file compile
 #!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
-g++ -std=c++17 -Wall -Wextra -I. -I../expandasquirt-v4 \
-    test_main.cpp ../expandasquirt-v4/sensor_pipeline.cpp \
+g++ -std=c++17 -Wall -Wextra -I. -I../firmware \
+    test_main.cpp ../firmware/sensor_pipeline.cpp \
     -o test_runner -lm
 ./test_runner
 ```
@@ -646,7 +646,7 @@ Tests complete: 3 passed, 0 failed
 - [ ] **Step 8: Commit**
 
 ```bash
-git add expandasquirt-v4/sensor_pipeline.h expandasquirt-v4/sensor_pipeline.cpp tests/
+git add firmware/sensor_pipeline.h firmware/sensor_pipeline.cpp tests/
 git commit -m "feat: thermistor Steinhart-Hart conversion with tests"
 ```
 
@@ -757,8 +757,8 @@ git commit -m "test: Bosch MAP conversion"
 ### Task 8: EWMA filter + tests
 
 **Files:**
-- Modify: `expandasquirt-v4/sensor_pipeline.h`
-- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
+- Modify: `firmware/sensor_pipeline.h`
+- Modify: `firmware/sensor_pipeline.cpp`
 - Modify: `tests/test_sensor_pipeline.cpp`
 
 - [ ] **Step 1: Write tests FIRST**
@@ -829,7 +829,7 @@ float ewma_step(float current, float new_sample, float alpha) {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/sensor_pipeline.{h,cpp} tests/test_sensor_pipeline.cpp
+git add firmware/sensor_pipeline.{h,cpp} tests/test_sensor_pipeline.cpp
 git commit -m "feat: EWMA filter with tests"
 ```
 
@@ -838,13 +838,13 @@ git commit -m "feat: EWMA filter with tests"
 ### Task 9: SensorState struct + read/filter/convert in production sketch
 
 **Files:**
-- Modify: `expandasquirt-v4/sensor_pipeline.h`
-- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/sensor_pipeline.h`
+- Modify: `firmware/sensor_pipeline.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Add `SensorState` and `SensorPhase()` declarations to header**
 
-Append to `expandasquirt-v4/sensor_pipeline.h`:
+Append to `firmware/sensor_pipeline.h`:
 
 ```c
 #include <stdint.h>
@@ -933,9 +933,9 @@ void SensorPhase() {
 }
 ```
 
-- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
+- [ ] **Step 3: Wire into `firmware.ino`**
 
-Modify `expandasquirt-v4/expandasquirt-v4.ino`:
+Modify `firmware/firmware.ino`:
 
 Add at top:
 ```c
@@ -965,7 +965,7 @@ if (now - lastPrintMs >= 500) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 Expected: clean compile.
@@ -979,7 +979,7 @@ Wire up:
 
 Flash:
 ```bash
-arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/
+arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> firmware/
 ```
 
 Open serial monitor at 115200 baud. Sweep the pot. Expected:
@@ -990,7 +990,7 @@ Open serial monitor at 115200 baud. Sweep the pot. Expected:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: SensorPhase reads, filters, converts all 5 channels"
 ```
 
@@ -1001,11 +1001,11 @@ git commit -m "feat: SensorPhase reads, filters, converts all 5 channels"
 ### Task 10: MCP2515 init + boot self-test
 
 **Files:**
-- Create: `expandasquirt-v4/can_protocol.h`
-- Create: `expandasquirt-v4/can_protocol.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Create: `firmware/can_protocol.h`
+- Create: `firmware/can_protocol.cpp`
+- Modify: `firmware/firmware.ino`
 
-- [ ] **Step 1: Create `expandasquirt-v4/can_protocol.h`**
+- [ ] **Step 1: Create `firmware/can_protocol.h`**
 
 ```c
 #ifndef CAN_PROTOCOL_H
@@ -1023,7 +1023,7 @@ void CanSendPhase();
 #endif
 ```
 
-- [ ] **Step 2: Create `expandasquirt-v4/can_protocol.cpp` skeleton with init + self-test**
+- [ ] **Step 2: Create `firmware/can_protocol.cpp` skeleton with init + self-test**
 
 ```c
 #include "can_protocol.h"
@@ -1081,7 +1081,7 @@ void CanSendPhase() {
 }
 ```
 
-- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
+- [ ] **Step 3: Wire into `firmware.ino`**
 
 Add `#include "can_protocol.h"` at top.
 
@@ -1096,7 +1096,7 @@ if (!can_protocol_init()) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 - [ ] **Step 5: 🔧 Bench-verify**
@@ -1105,7 +1105,7 @@ Plug the MCP2515 EF02037 shield onto the R4. Apply USB power. Open serial monito
 
 Expected:
 ```
-EXPANDASQUIRT v4 booting...
+EXPANDASQUIRT booting...
 MCP2515 init OK
 oilT=... ...
 ```
@@ -1115,7 +1115,7 @@ If `MCP2515 init failed` appears, troubleshoot before proceeding (check shield s
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/can_protocol.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/can_protocol.{h,cpp} firmware/firmware.ino
 git commit -m "feat: MCP2515 init with loopback self-test"
 ```
 
@@ -1124,8 +1124,8 @@ git commit -m "feat: MCP2515 init with loopback self-test"
 ### Task 11: Frame 1 byte packing + tests
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.h`
-- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `firmware/can_protocol.h`
+- Modify: `firmware/can_protocol.cpp`
 - Create: `tests/test_can_protocol.cpp`
 - Modify: `tests/test_main.cpp`
 - Modify: `tests/run-tests.sh`
@@ -1175,8 +1175,8 @@ Add `#include "test_can_protocol.cpp"`.
 - [ ] **Step 4: Update `tests/run-tests.sh`** to include `can_protocol.cpp`
 
 ```bash
-g++ -std=c++17 -Wall -Wextra -I. -I../expandasquirt-v4 \
-    test_main.cpp ../expandasquirt-v4/sensor_pipeline.cpp ../expandasquirt-v4/can_protocol.cpp \
+g++ -std=c++17 -Wall -Wextra -I. -I../firmware \
+    test_main.cpp ../firmware/sensor_pipeline.cpp ../firmware/can_protocol.cpp \
     -o test_runner -lm
 ```
 
@@ -1218,7 +1218,7 @@ Wrap the Arduino-specific bits in `#ifdef ARDUINO`:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add expandasquirt-v4/can_protocol.{h,cpp} tests/
+git add firmware/can_protocol.{h,cpp} tests/
 git commit -m "feat: Frame 1 packing with tests"
 ```
 
@@ -1227,8 +1227,8 @@ git commit -m "feat: Frame 1 packing with tests"
 ### Task 12: Frame 2 byte packing + tests
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.h`
-- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `firmware/can_protocol.h`
+- Modify: `firmware/can_protocol.cpp`
 - Modify: `tests/test_can_protocol.cpp`
 
 - [ ] **Step 1: Write tests FIRST**
@@ -1288,7 +1288,7 @@ void pack_frame2(const SensorState* s, uint8_t status_flags, uint8_t max_age, ui
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/can_protocol.{h,cpp} tests/test_can_protocol.cpp
+git add firmware/can_protocol.{h,cpp} tests/test_can_protocol.cpp
 git commit -m "feat: Frame 2 packing with tests"
 ```
 
@@ -1297,8 +1297,8 @@ git commit -m "feat: Frame 2 packing with tests"
 ### Task 13: CanSendPhase — broadcast both frames at 10 Hz
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/can_protocol.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Implement `CanSendPhase()` inside the `#ifdef ARDUINO` block**
 
@@ -1328,7 +1328,7 @@ void CanSendPhase() {
 }
 ```
 
-- [ ] **Step 2: Wire into `expandasquirt-v4.ino`**
+- [ ] **Step 2: Wire into `firmware.ino`**
 
 Replace the `// CanSendPhase() — Task 13` placeholder with:
 ```c
@@ -1338,7 +1338,7 @@ CanSendPhase();
 - [ ] **Step 3: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 - [ ] **Step 4: 🔧 Bench-verify with USB-CAN dongle**
@@ -1360,7 +1360,7 @@ If frames don't appear, check: shield wiring, CAN_H/CAN_L not swapped, 120Ω ter
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: CanSendPhase broadcasts Frames 1 and 2 at 10 Hz"
 ```
 
@@ -1374,9 +1374,9 @@ git commit -m "feat: CanSendPhase broadcasts Frames 1 and 2 at 10 Hz"
 > - **DEFERRED-TO-TASK-18** — `mcp2515.sendMessage()` return values are currently ignored in `CanSendPhase`. Track tx errors and surface into a CAN health/error counter as part of the health bitmask Phase D introduces.
 
 **Files:**
-- Create: `expandasquirt-v4/self_tests.h`
-- Create: `expandasquirt-v4/self_tests.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Create: `firmware/self_tests.h`
+- Create: `firmware/self_tests.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Create `self_tests.h`**
 
@@ -1443,7 +1443,7 @@ bool self_test_can_available() {
 }
 ```
 
-- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
+- [ ] **Step 3: Wire into `firmware.ino`**
 
 Replace the existing `if (!can_protocol_init()) {...}` block with:
 ```c
@@ -1461,7 +1461,7 @@ Same setup as Task 13. Expected: CAN frames continue normally; serial shows `MCP
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/self_tests.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/self_tests.{h,cpp} firmware/firmware.ino
 git commit -m "feat: boot self-test orchestration"
 ```
 
@@ -1475,8 +1475,8 @@ git commit -m "feat: boot self-test orchestration"
 > - **HIGH** — `sensor_health.h` MUST wrap function declarations in the `#ifdef __cplusplus / extern "C" { ... } / #endif` guard pattern, identical to `sensor_pipeline.h` and `can_protocol.h`. Without it, host tests declare `electrical_fault()` inside their own `extern "C"` block but the C++-mangled implementation symbol won't match → linker fails. (Same defect that bit Task 5; convention is established.)
 
 **Files:**
-- Create: `expandasquirt-v4/sensor_health.h`
-- Create: `expandasquirt-v4/sensor_health.cpp`
+- Create: `firmware/sensor_health.h`
+- Create: `firmware/sensor_health.cpp`
 - Create: `tests/test_sensor_health.cpp`
 - Modify: `tests/test_main.cpp` and `tests/run-tests.sh`
 
@@ -1516,7 +1516,7 @@ TEST_CASE(electrical_fault_in_normal_range) {
 
 - [ ] **Step 2: Create header**
 
-`expandasquirt-v4/sensor_health.h`:
+`firmware/sensor_health.h`:
 ```c
 #ifndef SENSOR_HEALTH_H
 #define SENSOR_HEALTH_H
@@ -1534,7 +1534,7 @@ bool electrical_fault(int adc_raw);
 
 - [ ] **Step 4: Implement**
 
-`expandasquirt-v4/sensor_health.cpp`:
+`firmware/sensor_health.cpp`:
 ```c
 #include "sensor_health.h"
 
@@ -1550,14 +1550,14 @@ bool electrical_fault(int adc_raw) {
 
 Add `#include "test_sensor_health.cpp"` to `test_main.cpp`.
 
-Add `../expandasquirt-v4/sensor_health.cpp` to `run-tests.sh` g++ command.
+Add `../firmware/sensor_health.cpp` to `run-tests.sh` g++ command.
 
 - [ ] **Step 6: Run tests, verify PASS**
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add expandasquirt-v4/sensor_health.{h,cpp} tests/
+git add firmware/sensor_health.{h,cpp} tests/
 git commit -m "feat: electrical fault detection"
 ```
 
@@ -1572,8 +1572,8 @@ git commit -m "feat: electrical fault detection"
 
 
 **Files:**
-- Modify: `expandasquirt-v4/sensor_health.h`
-- Modify: `expandasquirt-v4/sensor_health.cpp`
+- Modify: `firmware/sensor_health.h`
+- Modify: `firmware/sensor_health.cpp`
 - Modify: `tests/test_sensor_health.cpp`
 
 - [ ] **Step 1: Write tests FIRST**
@@ -1673,7 +1673,7 @@ bool debounce_update(DebounceState* d, bool sample_bad) {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/sensor_health.{h,cpp} tests/test_sensor_health.cpp
+git add firmware/sensor_health.{h,cpp} tests/test_sensor_health.cpp
 git commit -m "feat: debounce state machine"
 ```
 
@@ -1686,8 +1686,8 @@ git commit -m "feat: debounce state machine"
 
 
 **Files:**
-- Modify: `expandasquirt-v4/sensor_health.h`
-- Modify: `expandasquirt-v4/sensor_health.cpp`
+- Modify: `firmware/sensor_health.h`
+- Modify: `firmware/sensor_health.cpp`
 - Modify: `tests/test_sensor_health.cpp`
 
 - [ ] **Step 1: Write tests**
@@ -1742,7 +1742,7 @@ bool plausibility_kpa(float v)          { return v >= 0.0f   && v <= 200.0f; }
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/sensor_health.{h,cpp} tests/test_sensor_health.cpp
+git add firmware/sensor_health.{h,cpp} tests/test_sensor_health.cpp
 git commit -m "feat: plausibility checks for sensor values"
 ```
 
@@ -1759,9 +1759,9 @@ git commit -m "feat: plausibility checks for sensor values"
 
 
 **Files:**
-- Modify: `expandasquirt-v4/sensor_health.h`
-- Modify: `expandasquirt-v4/sensor_health.cpp`
-- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
+- Modify: `firmware/sensor_health.h`
+- Modify: `firmware/sensor_health.cpp`
+- Modify: `firmware/sensor_pipeline.cpp`
 
 - [ ] **Step 1: Add per-sensor health tracking to `sensor_health.h`**
 
@@ -1883,7 +1883,7 @@ Use USB-CAN dongle to capture and verify.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: per-sensor health bitmask in CAN frame"
 ```
 
@@ -1900,9 +1900,9 @@ git commit -m "feat: per-sensor health bitmask in CAN frame"
 
 
 **Files:**
-- Modify: `expandasquirt-v4/sensor_health.h`
-- Modify: `expandasquirt-v4/sensor_health.cpp`
-- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
+- Modify: `firmware/sensor_health.h`
+- Modify: `firmware/sensor_health.cpp`
+- Modify: `firmware/sensor_pipeline.cpp`
 - Modify: `tests/test_sensor_health.cpp`
 
 - [ ] **Step 1: Write tests**
@@ -2065,13 +2065,13 @@ if (channel_health_update(&h_oil_temp, ..., &flat_oil_temp, now, eng))   mask |=
 
 ```bash
 ./tests/run-tests.sh
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add expandasquirt-v4/ tests/
+git add firmware/ tests/
 git commit -m "feat: flatline detection with engine-running gate"
 ```
 
@@ -2082,9 +2082,9 @@ git commit -m "feat: flatline detection with engine-running gate"
 ### Task 20: Arduino_LED_Matrix init + boot animation
 
 **Files:**
-- Create: `expandasquirt-v4/display_matrix.h`
-- Create: `expandasquirt-v4/display_matrix.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Create: `firmware/display_matrix.h`
+- Create: `firmware/display_matrix.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Create header**
 
@@ -2158,7 +2158,7 @@ void DisplayUpdate() {
 }
 ```
 
-- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
+- [ ] **Step 3: Wire into `firmware.ino`**
 
 Add `#include "display_matrix.h"`.
 
@@ -2182,7 +2182,7 @@ Compile and flash. Expected: boot animation visible on LED matrix during boot, t
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/display_matrix.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/display_matrix.{h,cpp} firmware/firmware.ino
 git commit -m "feat: LED matrix init + boot animation"
 ```
 
@@ -2191,7 +2191,7 @@ git commit -m "feat: LED matrix init + boot animation"
 ### Task 21: Normal-mode display (heartbeat + sensor health LEDs)
 
 **Files:**
-- Modify: `expandasquirt-v4/display_matrix.cpp`
+- Modify: `firmware/display_matrix.cpp`
 
 - [ ] **Step 1: Implement `DISP_NORMAL`**
 
@@ -2238,7 +2238,7 @@ Flash. Expected:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add expandasquirt-v4/display_matrix.cpp
+git add firmware/display_matrix.cpp
 git commit -m "feat: normal-mode display with heartbeat and health LEDs"
 ```
 
@@ -2247,8 +2247,8 @@ git commit -m "feat: normal-mode display with heartbeat and health LEDs"
 ### Task 22: Error display (ERR##)
 
 **Files:**
-- Modify: `expandasquirt-v4/display_matrix.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/display_matrix.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Add 5×7 digit font in `display_matrix.cpp`**
 
@@ -2296,7 +2296,7 @@ Add to switch in `DisplayUpdate`:
 case DISP_ERROR: draw_error(); break;
 ```
 
-- [ ] **Step 2: Wire ERR codes into `expandasquirt-v4.ino`**
+- [ ] **Step 2: Wire ERR codes into `firmware.ino`**
 
 After `run_boot_self_tests()`:
 ```c
@@ -2322,7 +2322,7 @@ Reconnect shield, power-cycle. Expected: normal display.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: error code display on LED matrix"
 ```
 
@@ -2331,7 +2331,7 @@ git commit -m "feat: error code display on LED matrix"
 ### Task 23: Display state machine integration
 
 **Files:**
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Verify the display update is being called from main loop** (already done in Task 20)
 
@@ -2341,7 +2341,7 @@ Confirm `DisplayUpdate()` is in the `loop()` dispatcher with correct cadence (10
 
 Verify these transitions exist in code:
 - DISP_BOOT in `setup()` before self-tests
-- DISP_NORMAL after self-tests pass (in `expandasquirt-v4.ino`)
+- DISP_NORMAL after self-tests pass (in `firmware.ino`)
 - DISP_ERROR via `display_set_error()` on self-test failures
 
 If any missing, add them now. The boot → normal transition can be moved to right after `run_boot_self_tests()` returns clean.
@@ -2356,7 +2356,7 @@ Flash and power up. Expected:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/firmware.ino
 git commit -m "chore: confirm display state transitions wired correctly"
 ```
 
@@ -2367,9 +2367,9 @@ git commit -m "chore: confirm display state transitions wired correctly"
 ### Task 24: ArduinoBLE NUS service init + advertising
 
 **Files:**
-- Create: `expandasquirt-v4/ble_console.h`
-- Create: `expandasquirt-v4/ble_console.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Create: `firmware/ble_console.h`
+- Create: `firmware/ble_console.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Create `ble_console.h`**
 
@@ -2450,7 +2450,7 @@ void BleDumpPhase() {
 }
 ```
 
-- [ ] **Step 3: Wire into `expandasquirt-v4.ino`**
+- [ ] **Step 3: Wire into `firmware.ino`**
 
 Add `#include "ble_console.h"`.
 
@@ -2466,7 +2466,7 @@ Replace `// BleServicePhase() — Task 24` with `BleServicePhase();`.
 
 - [ ] **Step 4: 🔧 Bench-verify**
 
-Flash. Open `Serial Bluetooth Terminal` (Android) or `nRF Connect` (any platform). Scan for `EXPANDASQUIRT-v4`.
+Flash. Open `Serial Bluetooth Terminal` (Android) or `nRF Connect` (any platform). Scan for `EXPANDASQUIRT`.
 
 Expected:
 - Device visible in scan results
@@ -2477,7 +2477,7 @@ Expected:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/ble_console.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/ble_console.{h,cpp} firmware/firmware.ino
 git commit -m "feat: BLE NUS peripheral advertising"
 ```
 
@@ -2486,8 +2486,8 @@ git commit -m "feat: BLE NUS peripheral advertising"
 ### Task 25: Command parser with newline framing
 
 **Files:**
-- Modify: `expandasquirt-v4/ble_console.h`
-- Modify: `expandasquirt-v4/ble_console.cpp`
+- Modify: `firmware/ble_console.h`
+- Modify: `firmware/ble_console.cpp`
 
 - [ ] **Step 1: Add command callback infrastructure**
 
@@ -2579,7 +2579,7 @@ Expected response from Expandasquirt: `unknown command - type 'help'\r\n`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/ble_console.{h,cpp}
+git add firmware/ble_console.{h,cpp}
 git commit -m "feat: BLE command parser with newline framing"
 ```
 
@@ -2588,8 +2588,8 @@ git commit -m "feat: BLE command parser with newline framing"
 ### Task 26: BleDumpPhase + status command
 
 **Files:**
-- Modify: `expandasquirt-v4/ble_console.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/ble_console.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Implement `BleDumpPhase()`**
 
@@ -2644,7 +2644,7 @@ ble_register_command("status", cmd_status);
 
 - [ ] **Step 3: Wire `BleDumpPhase()` into main loop**
 
-Replace `// BleDumpPhase() — Task 26` in `expandasquirt-v4.ino` with `BleDumpPhase();`.
+Replace `// BleDumpPhase() — Task 26` in `firmware.ino` with `BleDumpPhase();`.
 
 - [ ] **Step 4: 🔧 Bench-verify**
 
@@ -2653,7 +2653,7 @@ Connect via phone, observe periodic dumps every 200 ms. Type `status`, expect on
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: BLE periodic dump + status command"
 ```
 
@@ -2662,7 +2662,7 @@ git commit -m "feat: BLE periodic dump + status command"
 ### Task 27: Calibration commands
 
 **Files:**
-- Modify: `expandasquirt-v4/ble_console.cpp`
+- Modify: `firmware/ble_console.cpp`
 
 - [ ] **Step 1: Add raw ADC + voltage helper + cal commands**
 
@@ -2699,7 +2699,7 @@ Connect via phone, type `cal pres1`. Expect raw ADC + voltage values.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add expandasquirt-v4/ble_console.cpp
+git add firmware/ble_console.cpp
 git commit -m "feat: BLE cal command for raw ADC inspection"
 ```
 
@@ -2708,7 +2708,7 @@ git commit -m "feat: BLE cal command for raw ADC inspection"
 ### Task 28: Reboot, reset, clear-errors, help commands
 
 **Files:**
-- Modify: `expandasquirt-v4/ble_console.cpp`
+- Modify: `firmware/ble_console.cpp`
 
 - [ ] **Step 1: Implement remaining commands**
 
@@ -2751,7 +2751,7 @@ Connect, type `help`. Expect command list. Type `reboot`. Expect Expandasquirt t
 - [ ] **Step 3: Commit**
 
 ```bash
-git add expandasquirt-v4/ble_console.cpp
+git add firmware/ble_console.cpp
 git commit -m "feat: BLE reboot and help commands"
 ```
 
@@ -2760,7 +2760,7 @@ git commit -m "feat: BLE reboot and help commands"
 ### Task 29: Connect-time banner
 
 **Files:**
-- Modify: `expandasquirt-v4/ble_console.cpp`
+- Modify: `firmware/ble_console.cpp`
 
 - [ ] **Step 1: Detect connection events and send banner**
 
@@ -2776,7 +2776,7 @@ void BleServicePhase() {
     if (now_connected && !was_connected) {
         // Just connected — send banner
         char buf[64];
-        snprintf(buf, sizeof(buf), "EXPANDASQUIRT v4 connected (uptime %lu sec)", millis() / 1000);
+        snprintf(buf, sizeof(buf), "EXPANDASQUIRT connected (uptime %lu sec)", millis() / 1000);
         ble_println(buf);
         ble_println("type 'help' for commands");
     }
@@ -2793,7 +2793,7 @@ Disconnect/reconnect via phone. Expect banner on each connect.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add expandasquirt-v4/ble_console.cpp
+git add firmware/ble_console.cpp
 git commit -m "feat: BLE connect-time banner"
 ```
 
@@ -2804,8 +2804,8 @@ git commit -m "feat: BLE connect-time banner"
 ### Task 30: Persistent state struct + flash read/write
 
 **Files:**
-- Create: `expandasquirt-v4/persistent.h`
-- Create: `expandasquirt-v4/persistent.cpp`
+- Create: `firmware/persistent.h`
+- Create: `firmware/persistent.cpp`
 
 - [ ] **Step 1: Research the R4 data flash API**
 
@@ -2905,13 +2905,13 @@ void persistent_record_boot(ResetCause cause) {
 - [ ] **Step 4: Compile**
 
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/persistent.{h,cpp}
+git add firmware/persistent.{h,cpp}
 git commit -m "feat: persistent state via EEPROM library"
 ```
 
@@ -2920,9 +2920,9 @@ git commit -m "feat: persistent state via EEPROM library"
 ### Task 31: Reset cause detection + boot command
 
 **Files:**
-- Modify: `expandasquirt-v4/persistent.cpp` (add reset cause detection)
-- Modify: `expandasquirt-v4/ble_console.cpp` (add `boot` command)
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/persistent.cpp` (add reset cause detection)
+- Modify: `firmware/ble_console.cpp` (add `boot` command)
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Detect reset cause via Renesas RSTSR registers**
 
@@ -2956,7 +2956,7 @@ Implementation note: the original plan content's masks for brownout, watchdog, a
 
 - [ ] **Step 2: Wire reset cause into `setup()`**
 
-In `expandasquirt-v4.ino`, before `run_boot_self_tests()`:
+In `firmware.ino`, before `run_boot_self_tests()`:
 ```c
 persistent_init();
 ResetCause cause = read_reset_cause();
@@ -2998,7 +2998,7 @@ Type `reboot`, reconnect, type `boot`. Expect `reset=SOFT_RESET`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: reset cause detection + boot command"
 ```
 
@@ -3007,7 +3007,7 @@ git commit -m "feat: reset cause detection + boot command"
 ### Task 32: Watchdog enable + feed
 
 **Files:**
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Research IWDT API on RA4M1**
 
@@ -3021,7 +3021,7 @@ If FSP integration is complex, a fallback: implement a software watchdog using `
 
 - [ ] **Step 2: Implement software watchdog (simpler fallback)**
 
-In `expandasquirt-v4.ino`:
+In `firmware.ino`:
 
 ```c
 static unsigned long last_loop_ms = 0;
@@ -3056,7 +3056,7 @@ Comment out / remove the test code after verification.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/firmware.ino
 git commit -m "feat: software watchdog with auto-reset"
 ```
 
@@ -3065,8 +3065,8 @@ git commit -m "feat: software watchdog with auto-reset"
 ### Task 33: System status flags wired into Frame 2
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.cpp`
-- Modify: `expandasquirt-v4/ble_console.cpp` (provide ble_client_connected for status)
+- Modify: `firmware/can_protocol.cpp`
+- Modify: `firmware/ble_console.cpp` (provide ble_client_connected for status)
 
 - [ ] **Step 1: Compose status flags byte from system state**
 
@@ -3118,7 +3118,7 @@ USB-CAN dongle. With BLE phone connected, Frame 2 byte 6 should be `0x09` (ready
 - [ ] **Step 3: Commit**
 
 ```bash
-git add expandasquirt-v4/can_protocol.cpp
+git add firmware/can_protocol.cpp
 git commit -m "feat: status flags in Frame 2 reflect system state"
 ```
 
@@ -3127,9 +3127,9 @@ git commit -m "feat: status flags in Frame 2 reflect system state"
 ### Task 34: System health monitoring (CAN errors, loop timing)
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.h`
-- Modify: `expandasquirt-v4/can_protocol.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/can_protocol.h`
+- Modify: `firmware/can_protocol.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Track CAN errors and loop timing**
 
@@ -3174,7 +3174,7 @@ if (gSystemHealth.can_busoff_active)   flags |= 0x80;  // bit 7
 // bit 6: loop timing — see below
 ```
 
-- [ ] **Step 2: Track loop timing in `expandasquirt-v4.ino`**
+- [ ] **Step 2: Track loop timing in `firmware.ino`**
 
 ```c
 static unsigned long loop_timing_warn_until = 0;
@@ -3226,7 +3226,7 @@ Reconnect; verify recovery.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: system health flags (CAN errors, loop timing, flatline)"
 ```
 
@@ -3237,7 +3237,7 @@ git commit -m "feat: system health flags (CAN errors, loop timing, flatline)"
 ### Task 35: MCP2515 RX filter for ID 1512
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.cpp`
+- Modify: `firmware/can_protocol.cpp`
 
 - [ ] **Step 1: Configure hardware filter to admit only ID 1512**
 
@@ -3265,7 +3265,7 @@ Verify by adding a temporary `Serial.println("got 1512")` in CanReceivePhase (ne
 - [ ] **Step 3: Commit**
 
 ```bash
-git add expandasquirt-v4/can_protocol.cpp
+git add firmware/can_protocol.cpp
 git commit -m "feat: MCP2515 RX filter for MS3 dash broadcast"
 ```
 
@@ -3274,10 +3274,10 @@ git commit -m "feat: MCP2515 RX filter for MS3 dash broadcast"
 ### Task 36: RPM parse + engine-running gate
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.h`
-- Modify: `expandasquirt-v4/can_protocol.cpp`
-- Modify: `expandasquirt-v4/sensor_pipeline.cpp`
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino`
+- Modify: `firmware/can_protocol.h`
+- Modify: `firmware/can_protocol.cpp`
+- Modify: `firmware/sensor_pipeline.cpp`
+- Modify: `firmware/firmware.ino`
 
 - [ ] **Step 1: Add `CanReceivePhase()` and RPM accessor**
 
@@ -3328,7 +3328,7 @@ static bool engine_running_now() {
 
 - [ ] **Step 3: Wire `CanReceivePhase()` into main loop**
 
-In `expandasquirt-v4.ino`, replace `// CanReceivePhase() — Task 36` with:
+In `firmware.ino`, replace `// CanReceivePhase() — Task 36` with:
 ```c
 CanReceivePhase();
 ```
@@ -3342,7 +3342,7 @@ Add temporary debug to BLE: type `status` and verify the `health` reflects engin
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: CAN RX of MS3 RPM broadcast for engine-running gate"
 ```
 
@@ -3621,9 +3621,9 @@ See `V4X-DESIGN.md` (especially §3.2, §4.4, §11.2) for the design rationale. 
 ### Task 41: Maintenance mode entry/exit state machine
 
 **Files:**
-- Create: `expandasquirt-v4/maintenance_mode.h`
-- Create: `expandasquirt-v4/maintenance_mode.cpp`
-- Modify: `expandasquirt-v4/ble_console.cpp` (add maintenance/abort commands)
+- Create: `firmware/maintenance_mode.h`
+- Create: `firmware/maintenance_mode.cpp`
+- Modify: `firmware/ble_console.cpp` (add maintenance/abort commands)
 
 - [ ] **Step 1: Create header**
 
@@ -3720,7 +3720,7 @@ ble_register_command("abort", cmd_abort);
 
 - [ ] **Step 4: Wire into main loop**
 
-In `expandasquirt-v4.ino`:
+In `firmware.ino`:
 
 Replace `// HttpServerServicePhase() — Task 42` (was placeholder) and the `if (maintenanceModeActive)` block with:
 ```c
@@ -3737,7 +3737,7 @@ Connect via BLE. Type `maintenance`. Expect: 3-sec countdown message, LED matrix
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: maintenance mode state machine + entry/abort"
 ```
 
@@ -3746,8 +3746,8 @@ git commit -m "feat: maintenance mode state machine + entry/abort"
 ### Task 42: AP mode + minimal HTTP server in maintenance mode
 
 **Files:**
-- Modify: `expandasquirt-v4/maintenance_mode.cpp`
-- Modify: `expandasquirt-v4/display_matrix.cpp` (add DISP_AP_READY rendering)
+- Modify: `firmware/maintenance_mode.cpp`
+- Modify: `firmware/display_matrix.cpp` (add DISP_AP_READY rendering)
 
 - [ ] **Step 1: Bring up AP and serve the upload page**
 
@@ -3834,7 +3834,7 @@ Trigger maintenance mode. Phone connects to `EXPANDASQUIRT-OTA` AP. Browser to `
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: AP mode + upload page in maintenance"
 ```
 
@@ -3843,8 +3843,8 @@ git commit -m "feat: AP mode + upload page in maintenance"
 ### Task 43: HTTP file upload + LED matrix progress
 
 **Files:**
-- Modify: `expandasquirt-v4/maintenance_mode.cpp`
-- Modify: `expandasquirt-v4/display_matrix.cpp`
+- Modify: `firmware/maintenance_mode.cpp`
+- Modify: `firmware/display_matrix.cpp`
 
 ⚠️ The exact integration here depends entirely on Task 38/40 findings. If `OTAUpdate::update(file_path)` works after staging a local file, this task implements that path. If only `download(url, path)` works, this task instead saves the upload to flash and serves it from a localhost-style endpoint. Implementation details below assume **Path α** worked — adapt as needed.
 
@@ -3912,7 +3912,7 @@ Trigger maintenance mode, upload a file via browser. Expect:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: HTTP upload streaming + LED progress bar"
 ```
 
@@ -3921,8 +3921,8 @@ git commit -m "feat: HTTP upload streaming + LED progress bar"
 ### Task 44: Apply OTA + reboot
 
 **Files:**
-- Modify: `expandasquirt-v4/maintenance_mode.cpp`
-- Modify: `expandasquirt-v4/display_matrix.cpp`
+- Modify: `firmware/maintenance_mode.cpp`
+- Modify: `firmware/display_matrix.cpp`
 
 - [ ] **Step 1: Implement MM_APPLYING state**
 
@@ -3976,7 +3976,7 @@ If apply fails, ERR99 displayed.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/
+git add firmware/
 git commit -m "feat: OTA apply + reboot completion"
 ```
 
@@ -4132,12 +4132,12 @@ See `DESIGN.md` for the full spec, `IMPLEMENTATION-PLAN.md` for the build plan.
 
 ## Build
 ```bash
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 ## Flash (USB)
 ```bash
-arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/
+arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> firmware/
 ```
 
 Wireless firmware updates are deferred to v4.x; see `DESIGN.md` section 6.4.3.
@@ -4322,7 +4322,7 @@ void setup() {
   Serial.println();
   Serial.print("IP: "); Serial.println(WiFi.localIP());
 
-  ArduinoOTA.begin(WiFi.localIP(), "expandasquirt-v4-proto", "testpw", InternalStorage);
+  ArduinoOTA.begin(WiFi.localIP(), "expandasquirt-proto", "testpw", InternalStorage);
   Serial.println("ArduinoOTA listening on port 65280");
 }
 
@@ -4399,7 +4399,7 @@ avahi-browse -r _arduino._tcp
 dns-sd -B _arduino._tcp local.   # if available; else use a phone with NsdManager test app
 ```
 
-Expected: `expandasquirt-v4-proto` appears in service browse results within ~5 sec, with the device's IP and port 65280. **This proves mDNS responder works on R4.**
+Expected: `expandasquirt-proto` appears in service browse results within ~5 sec, with the device's IP and port 65280. **This proves mDNS responder works on R4.**
 
 - [ ] **Step 9: Document results in `prototypes/ota_arduinoota/README.md`**
 
@@ -4682,7 +4682,7 @@ Add to the libraries section:
 - [ ] **Step 3: Verify clean compile**
 
 ```bash
-"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 Expected: existing build still passes (the include hasn't been added to the sketch yet, this is just confirming library install didn't break anything).
@@ -4699,10 +4699,10 @@ git commit -m "build: pin JAndrassy/ArduinoOTA library for v4.x"
 ### Task 57: 🧪 Percent-decode helper + RX buffer enlargement
 
 **Files:**
-- Modify: `expandasquirt-v4/ble_console.h` (raise `BLE_RX_BUFFER_SIZE`)
-- Modify: `expandasquirt-v4/ble_console.cpp` (apply new size)
-- Create: `expandasquirt-v4/util/pct_decode.h`
-- Create: `expandasquirt-v4/util/pct_decode.cpp`
+- Modify: `firmware/ble_console.h` (raise `BLE_RX_BUFFER_SIZE`)
+- Modify: `firmware/ble_console.cpp` (apply new size)
+- Create: `firmware/pct_decode.h`
+- Create: `firmware/pct_decode.cpp`
 - Create: `tests/test_pct_decode.cpp`
 - Modify: `tests/run-tests.sh` (add new test)
 
@@ -4710,7 +4710,7 @@ git commit -m "build: pin JAndrassy/ArduinoOTA library for v4.x"
 
 ```cpp
 // tests/test_pct_decode.cpp
-#include "../expandasquirt-v4/util/pct_decode.h"
+#include "../firmware/pct_decode.h"
 #include <cassert>
 #include <cstring>
 
@@ -4754,7 +4754,7 @@ Expected: linker error, `pct_decode` undefined.
 - [ ] **Step 3: Implement helper**
 
 ```cpp
-// expandasquirt-v4/util/pct_decode.h
+// firmware/pct_decode.h
 #pragma once
 #include <stddef.h>
 
@@ -4762,7 +4762,7 @@ bool pct_decode(const char* in, char* out, size_t out_capacity, size_t* out_len)
 ```
 
 ```cpp
-// expandasquirt-v4/util/pct_decode.cpp
+// firmware/pct_decode.cpp
 #include "pct_decode.h"
 
 static int hex_nibble(char c) {
@@ -4797,7 +4797,7 @@ In `tests/run-tests.sh`, append:
 ```bash
 g++ -std=c++17 -o tests/test_pct_decode \
     tests/test_pct_decode.cpp \
-    expandasquirt-v4/util/pct_decode.cpp
+    firmware/pct_decode.cpp
 ./tests/test_pct_decode && echo "[PASS] pct_decode"
 ```
 
@@ -4825,14 +4825,14 @@ Comment-block the rationale:
 - [ ] **Step 7: Verify firmware compile**
 
 ```bash
-"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 Expected: clean compile. Note the new RAM/flash usage.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add expandasquirt-v4/util/ expandasquirt-v4/ble_console.h tests/test_pct_decode.cpp tests/run-tests.sh
+git add firmware/ firmware/ble_console.h tests/test_pct_decode.cpp tests/run-tests.sh
 git commit -m "feat: percent-decode helper + 256B BLE RX buffer for maintenance command"
 ```
 
@@ -4841,15 +4841,15 @@ git commit -m "feat: percent-decode helper + 256B BLE RX buffer for maintenance 
 ### Task 58: New BLE commands — `maintenance ...` and `maintenance abort`
 
 **Files:**
-- Create: `expandasquirt-v4/maintenance_mode.h`
-- Create: `expandasquirt-v4/maintenance_mode.cpp` (skeleton — full state machine in Task 61)
-- Modify: `expandasquirt-v4/ble_console.cpp` (parse + dispatch)
+- Create: `firmware/maintenance_mode.h`
+- Create: `firmware/maintenance_mode.cpp` (skeleton — full state machine in Task 61)
+- Modify: `firmware/ble_console.cpp` (parse + dispatch)
 - Create: `tests/test_maintenance_args.cpp` (parser tests)
 
 - [ ] **Step 1: Define `MaintenanceArgs` and request API**
 
 ```c
-// expandasquirt-v4/maintenance_mode.h
+// firmware/maintenance_mode.h
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -4882,7 +4882,7 @@ bool maintenance_is_active();
 
 ```cpp
 // tests/test_maintenance_args.cpp
-#include "../expandasquirt-v4/maintenance_mode.h"
+#include "../firmware/maintenance_mode.h"
 #include <cassert>
 #include <cstring>
 
@@ -5042,14 +5042,14 @@ if (strncmp(cmd, "maintenance ", 12) == 0) {
 
 ```bash
 "C:/Program Files/Git/bin/bash.exe" tests/run-tests.sh
-"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+"C:/Program Files/Arduino CLI/arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 Expected: all tests pass; firmware compiles. Sketch size grows by ~1-2 KB.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add expandasquirt-v4/maintenance_mode.{h,cpp} expandasquirt-v4/ble_console.cpp tests/test_maintenance_args.cpp tests/run-tests.sh
+git add firmware/maintenance_mode.{h,cpp} firmware/ble_console.cpp tests/test_maintenance_args.cpp tests/run-tests.sh
 git commit -m "feat: maintenance command parsing + BLE dispatch (state machine stubbed)"
 ```
 
@@ -5058,14 +5058,14 @@ git commit -m "feat: maintenance command parsing + BLE dispatch (state machine s
 ### Task 59: Banner version token
 
 **Files:**
-- Modify: `expandasquirt-v4/config.h` (add `FIRMWARE_VERSION`, `FIRMWARE_BUILD`)
-- Modify: `expandasquirt-v4/ble_console.cpp` (extend connect-time banner)
+- Modify: `firmware/config.h` (add `FIRMWARE_VERSION`, `FIRMWARE_BUILD`)
+- Modify: `firmware/ble_console.cpp` (extend connect-time banner)
 
 - [ ] **Step 1: Add version constants to config.h**
 
 ```c
 // In config.h, near top with other version-y constants:
-#define FIRMWARE_VERSION "4.1.0"
+#define FIRMWARE_VERSION "1.0.0"
 #define FIRMWARE_BUILD   STR(GIT_SHORT_SHA)  // injected at compile time, see Step 2
 ```
 
@@ -5078,7 +5078,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    expandasquirt-v4/
+    firmware/
 ```
 
 Document this build invocation in `README.md` (section "Build with version stamp").
@@ -5096,7 +5096,7 @@ Document this build invocation in `README.md` (section "Build with version stamp
 In `ble_console.cpp`, locate the banner-on-connect routine (Task 29's code). Prepend a new first line:
 
 ```c
-ble_send_line("EXPANDASQUIRT-v4 version=" FIRMWARE_VERSION " build=" FIRMWARE_BUILD);
+ble_send_line("EXPANDASQUIRT version=" FIRMWARE_VERSION " build=" FIRMWARE_BUILD);
 ```
 
 The existing reset/boot/last_err line stays as the second line.
@@ -5108,20 +5108,20 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    expandasquirt-v4/
+    firmware/
 "C:/Program Files/Arduino CLI/arduino-cli.exe" upload \
-    --fqbn arduino:renesas_uno:unor4wifi --port COM8 expandasquirt-v4/
+    --fqbn arduino:renesas_uno:unor4wifi --port COM8 firmware/
 ```
 
 Connect via `Serial Bluetooth Terminal`. First line on connect should be:
 ```
-EXPANDASQUIRT-v4 version=4.1.0 build=4659186
+EXPANDASQUIRT version=1.0.0 build=4659186
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add expandasquirt-v4/config.h expandasquirt-v4/ble_console.cpp README.md
+git add firmware/config.h firmware/ble_console.cpp README.md
 git commit -m "feat: firmware version token in BLE connect banner"
 ```
 
@@ -5130,9 +5130,9 @@ git commit -m "feat: firmware version token in BLE connect banner"
 ### Task 60: Final CAN status frame on maintenance entry
 
 **Files:**
-- Modify: `expandasquirt-v4/can_protocol.h` (expose a "send single frame with custom flags" helper if not present)
-- Modify: `expandasquirt-v4/can_protocol.cpp`
-- Modify: `expandasquirt-v4/maintenance_mode.cpp` (call from MM_ARMED entry)
+- Modify: `firmware/can_protocol.h` (expose a "send single frame with custom flags" helper if not present)
+- Modify: `firmware/can_protocol.cpp`
+- Modify: `firmware/maintenance_mode.cpp` (call from MM_ARMED entry)
 
 - [ ] **Step 1: Add helper to set the OTA-in-progress bit and flush one CAN frame**
 
@@ -5174,7 +5174,7 @@ Flash. Trigger maintenance via BLE (`maintenance ssid=test psk=test pwd=test`). 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add expandasquirt-v4/can_protocol.{h,cpp} expandasquirt-v4/maintenance_mode.cpp
+git add firmware/can_protocol.{h,cpp} firmware/maintenance_mode.cpp
 git commit -m "feat: send final CAN status frame with OTA bit set on maintenance entry"
 ```
 
@@ -5183,9 +5183,9 @@ git commit -m "feat: send final CAN status frame with OTA bit set on maintenance
 ### Task 61: Maintenance state machine
 
 **Files:**
-- Modify: `expandasquirt-v4/maintenance_mode.cpp` (real state machine, replacing stubs)
-- Modify: `expandasquirt-v4/maintenance_mode.h` (state enum if exposed for tests)
-- Modify: `expandasquirt-v4/expandasquirt-v4.ino` (call `maintenance_tick(now)` each loop)
+- Modify: `firmware/maintenance_mode.cpp` (real state machine, replacing stubs)
+- Modify: `firmware/maintenance_mode.h` (state enum if exposed for tests)
+- Modify: `firmware/firmware.ino` (call `maintenance_tick(now)` each loop)
 
 - [ ] **Step 1: Define states**
 
@@ -5234,7 +5234,7 @@ static void transition_to(MMState s, uint32_t now) {
             WiFi.begin(s_args.ssid, s_args.psk);
             break;
         case MMState::OTA_READY:
-            ArduinoOTA.begin(WiFi.localIP(), "expandasquirt-v4", s_args.ota_pwd, InternalStorage);
+            ArduinoOTA.begin(WiFi.localIP(), "expandasquirt", s_args.ota_pwd, InternalStorage);
             display_set_pattern(DISPLAY_MAINT_READY);
             break;
         case MMState::UPLOAD_APPLYING:
@@ -5346,7 +5346,7 @@ ArduinoOTA.onError([](int code, const char* status) {
 
 - [ ] **Step 4: Call `maintenance_tick(millis())` from main loop**
 
-In `expandasquirt-v4.ino`'s `loop()`:
+In `firmware.ino`'s `loop()`:
 
 ```c
 void loop() {
@@ -5365,7 +5365,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    expandasquirt-v4/
+    firmware/
 ```
 
 Flash via USB. Connect BLE. Send `maintenance ssid=MEES psk=<actual> pwd=otatest`. Expected:
@@ -5387,7 +5387,7 @@ After Step 5 succeeds, push a test sketch via curl from a laptop on the hotspot 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add expandasquirt-v4/maintenance_mode.{h,cpp} expandasquirt-v4/expandasquirt-v4.ino
+git add firmware/maintenance_mode.{h,cpp} firmware/firmware.ino
 git commit -m "feat: maintenance state machine with per-state timeouts and ArduinoOTA integration"
 ```
 
@@ -5396,7 +5396,7 @@ git commit -m "feat: maintenance state machine with per-state timeouts and Ardui
 ### Task 62: LED matrix maintenance patterns
 
 **Files:**
-- Modify: `expandasquirt-v4/display_matrix.{h,cpp}`
+- Modify: `firmware/display_matrix.{h,cpp}`
 
 **What this does:** fills in the four maintenance LED patterns currently stubbed in `DESIGN.md` §6.5.
 
@@ -5464,7 +5464,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "C:/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    expandasquirt-v4/
+    firmware/
 ```
 
 Record program-storage and dynamic-memory percentages. **Hard stop if program storage > 49% (which would cross the half-flash apply boundary).**
@@ -5478,7 +5478,7 @@ If overflow: candidates to cut/compress, in order of preference:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add expandasquirt-v4/display_matrix.{h,cpp}
+git add firmware/display_matrix.{h,cpp}
 git commit -m "feat: LED matrix patterns for maintenance pending/ready/applying/error + final size check"
 ```
 
@@ -5952,7 +5952,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             ble.lines.collect { line ->
                 // Parse banner version line
-                if (line.startsWith("EXPANDASQUIRT-v4 version=")) {
+                if (line.startsWith("EXPANDASQUIRT version=")) {
                     val ver = Regex("""version=(\S+)""").find(line)?.groupValues?.get(1)
                     _state.update { it.copy(firmwareVersion = ver) }
                 }
@@ -6167,7 +6167,7 @@ fun scanForExpandasquirts(ctx: Context) = callbackFlow<ScannedDevice> {
     val cb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val name = result.device.name ?: result.scanRecord?.deviceName ?: return
-            if (name == "EXPANDASQUIRT-v4") {
+            if (name == "EXPANDASQUIRT") {
                 trySend(ScannedDevice(result.device.address, name, result.rssi))
             }
         }
@@ -6725,7 +6725,7 @@ import java.net.InetAddress
 suspend fun resolveExpandasquirtIp(
     ctx: Context,
     network: Network,
-    expectedName: String = "expandasquirt-v4",
+    expectedName: String = "expandasquirt",
     timeoutMs: Long = 15_000,
 ): InetAddress? = withTimeoutOrNull(timeoutMs) {
     val nsd = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager
@@ -7028,7 +7028,7 @@ class OtaViewModel(
                     _step.value = OtaStep.Verifying
                     val outcome = withTimeoutOrNull(30_000) {
                         ble.state.first { it is BleState.Connected }
-                        ble.lines.first { it.startsWith("EXPANDASQUIRT-v4 version=") }
+                        ble.lines.first { it.startsWith("EXPANDASQUIRT version=") }
                     }
                     if (outcome == null) {
                         fail("Push outcome unknown and device didn't come back over BLE", true)
@@ -7053,7 +7053,7 @@ class OtaViewModel(
             // Reconnect BLE — autoreconnect should kick in. Just wait for state.
             val newVersion = withTimeoutOrNull(30_000) {
                 ble.state.first { it is BleState.Connected }
-                val ver = ble.lines.first { it.startsWith("EXPANDASQUIRT-v4 version=") }
+                val ver = ble.lines.first { it.startsWith("EXPANDASQUIRT version=") }
                 Regex("""version=(\S+)""").find(ver)?.groupValues?.get(1) ?: "unknown"
             }
             if (newVersion == null) {
@@ -7160,10 +7160,10 @@ GIT_SHA=$(git rev-parse --short HEAD)
     --fqbn arduino:renesas_uno:unor4wifi \
     --output-dir build/test-ota/ \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=${GIT_SHA}" \
-    expandasquirt-v4/
+    firmware/
 ```
 
-Then walk through the wizard with `build/test-ota/expandasquirt-v4.ino.bin`. Expected: device reboots into 4.1.1, app reconnects, "Update complete. Now running 4.1.1." (Roll back to the original version via USB after testing.)
+Then walk through the wizard with `build/test-ota/firmware.ino.bin`. Expected: device reboots into 4.1.1, app reconnects, "Update complete. Now running 4.1.1." (Roll back to the original version via USB after testing.)
 
 - [ ] **Step 5: Commit**
 
@@ -7250,7 +7250,7 @@ fun UsbRescueScreen(onBack: () -> Unit) {
             Text("3. Re-flash the last known-good firmware:")
             Card(modifier = Modifier.padding(vertical = 4.dp)) {
                 Text(
-                    """arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/expandasquirt-v4/""",
+                    """arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/firmware/""",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(8.dp),

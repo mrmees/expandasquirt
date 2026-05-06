@@ -10,7 +10,7 @@ shell.
 
 Usage:
     python tools/ble_terminal.py                       # scan by name
-    python tools/ble_terminal.py --name EXPANDASQUIRT-v4
+    python tools/ble_terminal.py --name EXPANDASQUIRT
     python tools/ble_terminal.py --address XX:XX:XX:XX:XX:XX
 
 Requires: pip install bleak
@@ -69,8 +69,8 @@ async def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__.strip().splitlines()[0],
     )
-    ap.add_argument("--name", default="EXPANDASQUIRT-v4",
-                    help="device name to scan for (default: EXPANDASQUIRT-v4)")
+    ap.add_argument("--name", default="EXPANDASQUIRT",
+                    help="device name to scan for (default: EXPANDASQUIRT)")
     ap.add_argument("--address",
                     help="BLE address (skips scan if given)")
     ap.add_argument("--scan-timeout", type=float, default=10.0,

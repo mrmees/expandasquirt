@@ -23,7 +23,7 @@ wiring details.
 
 Plain build (FIRMWARE_BUILD = "unknown"):
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 Build with git-sha stamp (recommended for any build that may be OTA-pushed —
@@ -34,7 +34,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 "/c/Program Files/Arduino CLI/arduino-cli.exe" compile \
     --fqbn arduino:renesas_uno:unor4wifi \
     --build-property "build.extra_flags=-DGIT_SHORT_SHA=$GIT_SHA" \
-    expandasquirt-v4/
+    firmware/
 ```
 
 Pinned board and library versions are listed in [libraries.txt](libraries.txt).
@@ -46,7 +46,7 @@ v4 firmware can be updated either over USB or wirelessly via the v4.x companion 
 **USB:**
 
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> expandasquirt-v4/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> firmware/
 ```
 
 Replace `COM<N>` with the R4 serial port.

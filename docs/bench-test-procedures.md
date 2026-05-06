@@ -2,7 +2,7 @@
 
 These procedures expand the Phase 1 bench tests from `DESIGN.md` section 8.1.
 Test IDs and titles are copied from that section. Numeric constants come from
-`DESIGN.md` or `expandasquirt-v4/config.h`; when the source does not define a
+`DESIGN.md` or `firmware/config.h`; when the source does not define a
 numeric threshold, this document says so.
 
 ## Common Setup
@@ -20,7 +20,7 @@ numeric threshold, this document says so.
 Build before bench work:
 
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi firmware/
 ```
 
 Host-side unit tests before bench work:
@@ -51,7 +51,7 @@ Steps:
 Pass criteria:
 - No smoke, odor, abnormal heating, or current-limit event.
 - Buck-boost output remains regulated at 12V.
-- R4 boots and prints `EXPANDASQUIRT v4 booting...`.
+- R4 boots and prints `EXPANDASQUIRT booting...`.
 - Idle current is measured and recorded. `DESIGN.md` section 8.1 requires an
   expected idle-current check, but no numeric expected current is specified in
   the design or code.

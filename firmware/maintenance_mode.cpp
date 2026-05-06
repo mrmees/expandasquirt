@@ -1,4 +1,4 @@
-// expandasquirt-v4/maintenance_mode.cpp — v4.x maintenance/OTA state machine.
+// firmware/maintenance_mode.cpp — v4.x maintenance/OTA state machine.
 //
 // State spec in V4X-DESIGN.md §5.3:
 //
@@ -98,7 +98,7 @@ void enter_wifi_joining() {
 void enter_ota_ready() {
     ArduinoOTA.onStart(on_ota_start);
     ArduinoOTA.onError(on_ota_error);
-    ArduinoOTA.begin(WiFi.localIP(), "expandasquirt-v4", s_args.ota_pwd, InternalStorage);
+    ArduinoOTA.begin(WiFi.localIP(), "expandasquirt", s_args.ota_pwd, InternalStorage);
     display_set_mode(DISP_AP_READY);
 }
 

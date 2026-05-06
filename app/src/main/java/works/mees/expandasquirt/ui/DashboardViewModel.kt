@@ -69,7 +69,7 @@ class DashboardViewModel(
         }
         viewModelScope.launch {
             ble.lines.collect { line ->
-                if (line.startsWith("EXPANDASQUIRT-v4 version=")) {
+                if (line.startsWith("EXPANDASQUIRT version=")) {
                     val ver = Regex("""version=(\S+)""").find(line)?.groupValues?.get(1)
                     _state.update { it.copy(firmwareVersion = ver) }
                 }

@@ -158,8 +158,8 @@ class OtaViewModel(
         _step.value = OtaStep.EnteringMaintenance("Waiting for Expandasquirt to join hotspot")
         delay(5_000)
 
-        _step.value = OtaStep.FindingDevice("Looking for expandasquirt-v4 on hotspot")
-        val endpoint = discoverExpandasquirt(ctx, "expandasquirt-v4", 15_000)
+        _step.value = OtaStep.FindingDevice("Looking for expandasquirt on hotspot")
+        val endpoint = discoverExpandasquirt(ctx, "expandasquirt", 15_000)
         if (endpoint == null) {
             failWithReconnect("Device didn't appear on hotspot within 15 sec", canRetry = true, showUsbRescue = true)
             return

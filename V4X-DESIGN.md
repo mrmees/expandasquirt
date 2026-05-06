@@ -47,7 +47,7 @@
 
 The Expandasquirt has two transport modes: **normal** (BLE up, WiFi off, CAN/sensors live) and **maintenance** (BLE down, WiFi STA up, sensors/CAN halted, ArduinoOTA listener active). The transition is one-way during a maintenance event; recovery to normal mode is via reboot. **The transports never run concurrently** — DESIGN.md §6.6 rejected dual-stack BLE+WiFi for normal-mode reasons, and the brief transition window is structured to keep them serial as well.
 
-**IP discovery:** since BLE is down before WiFi is up, the app can't receive the device's DHCP-assigned IP over BLE. Discovery is via **mDNS** (`expandasquirt-v4._arduino._tcp.local`, advertised by the JAndrassy library's default mDNS responder). The Android side uses `NsdManager.discoverServices()` without Network scoping; multicast propagates out all interfaces by default. mDNS reachability on the R4's modem firmware is one of the bench-prototype gates (§11).
+**IP discovery:** since BLE is down before WiFi is up, the app can't receive the device's DHCP-assigned IP over BLE. Discovery is via **mDNS** (`expandasquirt._arduino._tcp.local`, advertised by the JAndrassy library's default mDNS responder). The Android side uses `NsdManager.discoverServices()` without Network scoping; multicast propagates out all interfaces by default. mDNS reachability on the R4's modem firmware is one of the bench-prototype gates (§11).
 
 ### 3.2 OTA flow
 
@@ -60,9 +60,9 @@ Normal: BLE active, dashboard updates                          [user taps "Firmw
 1. App sends: maintenance ssid=<pct> psk=<pct> pwd=<pct>\n  (BLE)
 2. Expandasquirt:  reply OK maintenance armed timeout=3000 → MM_ARMED → 3s drain → end BLE
 3. Expandasquirt:  switch modem to STA, WiFi.begin(ssid, psk)
-4. Expandasquirt:  ArduinoOTA.begin(ip, "expandasquirt-v4", pwd, InternalStorage)
+4. Expandasquirt:  ArduinoOTA.begin(ip, "expandasquirt", pwd, InternalStorage)
               [JAndrassy default registers mDNS responder for _arduino._tcp.local]
-5. App:       waits ~5s post-BLE-drop, then mDNS-resolves "expandasquirt-v4._arduino._tcp.local"
+5. App:       waits ~5s post-BLE-drop, then mDNS-resolves "expandasquirt._arduino._tcp.local"
               via Android NsdManager → device IP
 6. App:       POST http://<ip>:65280/sketch with Basic auth, body=raw .bin
 7. Expandasquirt:  read body → InternalStorage.write() loop → 200 OK → apply()
@@ -77,7 +77,7 @@ Normal: BLE active, dashboard updates                          [user taps "Firmw
 
 ### 4.1 Screens
 
-**S1. Device picker / first-run.** Shows on first launch or when no current device is set. Scan results filter to `EXPANDASQUIRT-v4` advertised name. Tap one → set as current → navigate to dashboard. Includes a "rescan" affordance. Reachable later via the device-name button in the dashboard top bar.
+**S1. Device picker / first-run.** Shows on first launch or when no current device is set. Scan results filter to `EXPANDASQUIRT` advertised name. Tap one → set as current → navigate to dashboard. Includes a "rescan" affordance. Reachable later via the device-name button in the dashboard top bar.
 
 **S2. Live dashboard.** Default screen after first connect. Layout B — compact spec list of the 5 sensors (oilT, oilP, fuelP, preP, postT) with health-dot indicator, value, and unit. Below the list: small meta strip (`seq · health 0xNN · age N.Ns`). Top bar: device nickname (tap → S1), connection state, overflow menu. Refresh cadence: ~2 Hz from the parsed BLE periodic dump (firmware sends at 5 Hz; app coalesces).
 
@@ -97,7 +97,7 @@ Each wraps the corresponding existing BLE command. Output is shown as monospace 
 3. Hotspot setup + push: collects or confirms the phone hotspot SSID/password, requires WPA2-Personal, opens Android hotspot settings for the user to toggle the hotspot on, sends BLE `maintenance` command, BLE drops, mDNS lookup resolves device IP, POSTs the file. Shows a progress bar during HTTP upload.
 4. Apply: spinner with "Device is flashing. Don't disturb." message. 30 sec timeout for BLE re-discovery.
 5. Verify: reads connect banner of new device, shows version token. "Update complete" or "Verification failed — try USB rescue."
-6. USB rescue (failure dead-end): bundled local screen with the exact `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> expandasquirt-v4/` command and bootloader-force steps. Reachable from the wizard's failure path AND from the diagnostic screen anytime.
+6. USB rescue (failure dead-end): bundled local screen with the exact `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> firmware/` command and bootloader-force steps. Reachable from the wizard's failure path AND from the diagnostic screen anytime.
 
 ### 4.2 State / persistence
 
@@ -113,7 +113,7 @@ Persisted hotspot SSID/password in DataStore for repeat OTA runs. No persisted s
 
 ### 4.3 BLE central behavior
 
-- Scan filter: advertised local name == `EXPANDASQUIRT-v4`.
+- Scan filter: advertised local name == `EXPANDASQUIRT`.
 - Connect to current device's MAC.
 - Discover NUS service (`6E400001-...`), TX char (notify, `...0003-...`), RX char (write, `...0002-...`).
 - Subscribe to TX notify on connect.
@@ -133,7 +133,7 @@ Used only during the OTA wizard's push step. LOH was rejected because Android 16
    - Repeat path: SSID + password are pre-filled from DataStore. User can edit them or tap **Use saved**. A **Clear saved hotspot** action belongs on the diagnostics screen later; out of scope for this document's screen detail.
 4. After the user enables their phone hotspot in system settings and confirms credentials in the wizard, the app proceeds without capturing a `Network` handle. Bench-verified on Pixel 8 / Android 16 r4 (2026-05-05): when the phone acts as a hotspot AP, Android does NOT expose the hotspot interface as a Network in `ConnectivityManager` — only the phone's own WiFi STA Network is visible. The phone's kernel routes packets to the hotspot subnet through the AP interface automatically (specific-subnet route in the routing table), so OkHttp and NsdManager work correctly without explicit Network scoping.
 5. App sends BLE `maintenance ssid=<pct> psk=<pct> pwd=<pct>\n` using the confirmed SSID/password and generated OTA password. Firmware behavior is unchanged.
-6. R4 joins the user-enabled hotspot. App waits ~5s after BLE drop, discovers `expandasquirt-v4._arduino._tcp.local` via `NsdManager.discoverServices("_arduino._tcp.", PROTOCOL_DNS_SD)`, then pushes the firmware over HTTP as before.
+6. R4 joins the user-enabled hotspot. App waits ~5s after BLE drop, discovers `expandasquirt._arduino._tcp.local` via `NsdManager.discoverServices("_arduino._tcp.", PROTOCOL_DNS_SD)`, then pushes the firmware over HTTP as before.
 7. On terminal success or failure, app prompts: "You can turn the hotspot off now." Android does not expose unprivileged APIs to toggle tethering off programmatically.
 
 The HTTP request does not need app-level Network scoping. The phone's kernel has the specific hotspot-subnet route through the AP interface, so an ordinary OkHttp request to the discovered Expandasquirt IP routes correctly.
@@ -205,7 +205,7 @@ Cancel armed maintenance before BLE drop only. Not supported after BLE teardown.
 Existing connect banner sends reset cause / boot counter / last fatal err per `DESIGN.md:542-543`. Extend it to start with a parseable version line:
 
 ```
-EXPANDASQUIRT-v4 version=4.x.y build=<git>\r\n
+EXPANDASQUIRT version=4.x.y build=<git>\r\n
 reset=<cause> boot=<n> last_err=<code>\r\n
 ... (rest of existing banner)
 ```
@@ -220,7 +220,7 @@ The first line gives the app a reliable verification source post-OTA.
 | `MM_ARMED` | Reply `OK maintenance armed timeout=3000`; LED maintenance-pending pattern; send final CAN status frame with maintenance bit set; stop periodic BLE dumps. | 3 sec elapsed → `MM_BLE_DRAIN`. `maintenance abort\n` → `MM_ABORTING`. | 10 sec absolute max → `MM_ABORTING`. |
 | `MM_BLE_DRAIN` | 1 sec drain window for in-flight BLE TX. No new BLE traffic generated here — the app already received `OK maintenance armed timeout=3000` in `MM_ARMED` and knows BLE will go down. | Drain window elapsed → `MM_WIFI_JOINING`. | Hard 1 sec cap. |
 | `MM_WIFI_JOINING` | End BLE; switch modem to STA; `WiFi.begin(ssid, psk)`. | `WL_CONNECTED` and `localIP()` valid → `MM_OTA_READY`. | 30 sec join deadline → reboot to NORMAL (recovery). |
-| `MM_OTA_READY` | `ArduinoOTA.begin(localIp, "expandasquirt-v4", pwd, InternalStorage)` — JAndrassy default global is the mDNS variant, so `_arduino._tcp.local` is advertised automatically; LED maintenance-ready pattern. | Library's `onStartCallback` fires → `MM_UPLOAD_APPLYING`. | 5 min idle → reboot to NORMAL. |
+| `MM_OTA_READY` | `ArduinoOTA.begin(localIp, "expandasquirt", pwd, InternalStorage)` — JAndrassy default global is the mDNS variant, so `_arduino._tcp.local` is advertised automatically; LED maintenance-ready pattern. | Library's `onStartCallback` fires → `MM_UPLOAD_APPLYING`. | 5 min idle → reboot to NORMAL. |
 | `MM_UPLOAD_APPLYING` | LED maintenance-applying pattern. Call `ArduinoOTA.poll()` from main loop. | Successful upload causes library to `apply()` and `NVIC_SystemReset` (control never returns). Library `onErrorCallback` → `MM_OTA_ERROR`. | Hardware watchdog catches stuck-during-poll. Reboot recovers. |
 | `MM_OTA_ERROR` | LED error pattern; ERR99 on display; clear WiFi. | 5 sec elapsed → reboot to NORMAL. | 5 sec hard. |
 | `MM_ABORTING` | Reply `OK maintenance aborted` (if BLE still up); restore normal LED. | Immediate → `MM_NORMAL`. | None. |
@@ -276,7 +276,7 @@ A bundled in-app screen (no internet required) showing:
 2. **Force the bootloader if the device isn't seen:** double-tap the reset button to enter bootloader mode (verify procedure on Matthew's specific R4 clone before publishing).
 3. **Re-flash with:**
    ```
-   arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/expandasquirt-v4/
+   arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port <PORT> /path/to/firmware/
    ```
 4. **Verify** by re-opening the app and confirming the banner version.
 

@@ -33,7 +33,7 @@ void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 3000) { /* wait briefly for USB */ }
 
-    Serial.println(F("EXPANDASQUIRT v4 booting..."));
+    Serial.println(F("EXPANDASQUIRT booting..."));
 
     analogReadResolution(ADC_RESOLUTION_BITS);
     display_init();

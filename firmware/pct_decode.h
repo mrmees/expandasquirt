@@ -1,4 +1,4 @@
-// expandasquirt-v4/util/pct_decode.h — percent-encoding decoder for the maintenance
+// firmware/pct_decode.h — percent-encoding decoder for the maintenance
 // command parser (V4X-DESIGN.md §5.1). Used to safely carry SSID / WPA2 PSK /
 // OTA password values through the existing single-space BLE command parser
 // without escaping headaches.

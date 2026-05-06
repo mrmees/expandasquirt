@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "expandasquirt-v4"
+rootProject.name = "expandasquirt"
 include(":app")

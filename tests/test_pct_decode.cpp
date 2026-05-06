@@ -2,7 +2,7 @@
 // by the maintenance command parser (V4X-DESIGN.md §5.1, IMPLEMENTATION-PLAN.md
 // Task 57). Included by test_main.cpp.
 
-#include "../expandasquirt-v4/pct_decode.h"
+#include "../firmware/pct_decode.h"
 
 TEST_CASE(pct_decode_plain_ascii_passthrough) {
     char out[64];

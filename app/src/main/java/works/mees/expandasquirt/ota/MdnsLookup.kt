@@ -16,7 +16,7 @@ data class ExpandasquirtEndpoint(
 
 suspend fun discoverExpandasquirt(
     ctx: Context,
-    expectedName: String = "expandasquirt-v4",
+    expectedName: String = "expandasquirt",
     timeoutMillis: Long = 15_000,
 ): ExpandasquirtEndpoint? {
     val nsd = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager

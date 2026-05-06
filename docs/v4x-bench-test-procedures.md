@@ -8,13 +8,13 @@ verify). Architecture in `V4X-DESIGN.md`; task spec in
 
 ## Setup
 
-- EXPANDASQUIRT v4 hardware (R4 WiFi) with the v4.1.0 baseline sketch loaded.
+- EXPANDASQUIRT v4 hardware (R4 WiFi) with the v1.0.0 baseline sketch loaded.
 - Phone with the expandasquirt companion app installed (debug build is fine),
   paired to the Expandasquirt over BLE on the dashboard screen.
 - Phone Wi-Fi hotspot configured but **off** at the start of each cycle.
   Note the SSID and password — these are the inputs to the wizard.
 - Phone has a `.bin` ready in `Download/` from a recent
-  `arduino-cli compile --output-dir <dir> expandasquirt-v4/` run. Bumping
+  `arduino-cli compile --output-dir <dir> firmware/` run. Bumping
   `FIRMWARE_VERSION` in `config.h` between cycles makes the dashboard
   banner check after reconnect a real verification.
 - USB cable from R4 to the dev workstation for serial diagnostics.
@@ -25,7 +25,7 @@ verify). Architecture in `V4X-DESIGN.md`; task spec in
 Build before bench work:
 
 ```powershell
-& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi --output-dir .tmp-ota-build expandasquirt-v4/
+& "C:\Program Files\Arduino CLI\arduino-cli.exe" compile --fqbn arduino:renesas_uno:unor4wifi --output-dir .tmp-ota-build firmware/
 ```
 
 ## Cycle Procedure

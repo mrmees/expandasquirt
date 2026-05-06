@@ -4,7 +4,7 @@
 // ===== Firmware version =====
 // FIRMWARE_VERSION is the human-readable semver-ish string for the running build.
 // FIRMWARE_BUILD is a git short-SHA injected at compile time via:
-//   arduino-cli compile --fqbn ... --build-property "build.extra_flags=-DGIT_SHORT_SHA=$(git rev-parse --short HEAD)" expandasquirt-v4/
+//   arduino-cli compile --fqbn ... --build-property "build.extra_flags=-DGIT_SHORT_SHA=$(git rev-parse --short HEAD)" firmware/
 // Without that flag, FIRMWARE_BUILD falls back to "unknown" — handy for local
 // experiments but production builds for OTA push should always be stamped.
 // Surfaced in the BLE connect banner per V4X-DESIGN.md §5.2 so the companion
@@ -14,7 +14,7 @@
 #endif
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-#define FIRMWARE_VERSION "4.1.0"
+#define FIRMWARE_VERSION "1.0.0"
 #define FIRMWARE_BUILD   STR(GIT_SHORT_SHA)
 
 // ===== Pin map (per DESIGN.md §2.3) =====
@@ -86,7 +86,7 @@
 #define ENGINE_RUNNING_OIL_PSI 5
 
 // ===== BLE =====
-#define BLE_DEVICE_NAME       "EXPANDASQUIRT-v4"
+#define BLE_DEVICE_NAME       "EXPANDASQUIRT"
 #define BLE_SERVICE_UUID      "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_TX_CHAR_UUID      "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_RX_CHAR_UUID      "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"

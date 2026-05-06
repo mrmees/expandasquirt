@@ -42,7 +42,7 @@ fun UsbRescueScreen(onBack: () -> Unit) {
         arduino-cli upload \
           --fqbn arduino:renesas_uno:unor4wifi \
           --port <COM_PORT> \
-          /path/to/expandasquirt-v4/
+          /path/to/firmware/
     """.trimIndent()
 
     Scaffold(

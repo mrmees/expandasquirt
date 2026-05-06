@@ -19,7 +19,7 @@ fun scanForExpandasquirts(ctx: Context) = callbackFlow {
     val cb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val name = result.device.name ?: result.scanRecord?.deviceName ?: return
-            if (name == "EXPANDASQUIRT-v4") {
+            if (name == "EXPANDASQUIRT") {
                 trySend(ScannedDevice(result.device.address, name, result.rssi))
             }
         }

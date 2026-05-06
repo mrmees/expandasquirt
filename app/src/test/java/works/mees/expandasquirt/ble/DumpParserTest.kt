@@ -50,7 +50,7 @@ class DumpParserTest {
     @Test fun ignoresUnrelatedLines() {
         val parser = DumpParser()
         // Banner/version line arriving on connect — should not affect parser
-        assertNull(parser.feed("EXPANDASQUIRT-v4 version=4.1.0 build=abc123"))
+        assertNull(parser.feed("EXPANDASQUIRT version=1.0.0 build=abc123"))
         assertNull(parser.feed("reset=4 boot=42 last_err=00"))
         assertNull(parser.feed("> some command echo"))
 

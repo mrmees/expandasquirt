@@ -420,7 +420,7 @@ release that will ship together with a companion Android app (see §6.4.3).
 #### 6.4.1 Today's workflow (USB)
 
 1. Open the enclosure (or just keep it open during dev iteration).
-2. `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> expandasquirt-v4/`
+2. `arduino-cli upload --fqbn arduino:renesas_uno:unor4wifi --port COM<N> firmware/`
 3. Sketch resets and reboots into the new firmware.
 
 This is the same workflow used throughout v4 development. No external services,
@@ -507,7 +507,7 @@ Wireless OTA is deferred to v4.x; the current roadmap is in §6.4.
 
 Using the standard NUS UUIDs (rather than custom) means `Serial Bluetooth Terminal`, `nRF Connect`, and most generic BLE serial apps recognize the service automatically without configuration.
 
-**Device name (advertised):** `EXPANDASQUIRT-v4` (visible in BLE scanners)
+**Device name (advertised):** `EXPANDASQUIRT` (visible in BLE scanners)
 
 **MTU and fragmentation:**
 - BLE 4.x default MTU is 23 bytes (20 byte payload after ATT overhead)
@@ -721,14 +721,14 @@ The following items are placeholders in the design that need bench verification 
 ### 11.3 Repository file layout
 
 ```
-projects/expandasquirt-v4/
+projects/expandasquirt/
 ├── DESIGN.md                       # This file
 ├── README.md                       # Build / flash / wiring quickstart
 ├── secrets.h.template              # Template for secrets.h
 ├── secrets.h                       # gitignored — v4.x wireless update secrets, if needed
 ├── libraries.txt                   # Pinned library versions
-├── expandasquirt-v4/                    # Arduino sketch root
-│   ├── expandasquirt-v4.ino             # setup() / loop() — minimal, dispatches to phases
+├── firmware/                    # Arduino sketch root
+│   ├── firmware.ino             # setup() / loop() — minimal, dispatches to phases
 │   ├── config.h                    # All tunable constants (pin map, EWMA α, thresholds)
 │   ├── sensor_pipeline.h/.cpp      # ADC read, EWMA, Steinhart-Hart, conversions
 │   ├── sensor_health.h/.cpp        # Per-sensor fault state machines, debounce
@@ -758,8 +758,8 @@ projects/expandasquirt-v4/
 
 **Bench/development (primary):**
 ```
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi expandasquirt-v4/
-arduino-cli upload  --fqbn arduino:renesas_uno:unor4wifi --port /dev/ttyACM0 expandasquirt-v4/
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/
+arduino-cli upload  --fqbn arduino:renesas_uno:unor4wifi --port /dev/ttyACM0 firmware/
 ```
 or equivalent in the Arduino IDE 2.x.
 
@@ -769,8 +769,8 @@ or equivalent in the Arduino IDE 2.x.
 
 **Building a `.bin` for future wireless OTA (deferred to v4.x):**
 ```
-arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --output-dir build expandasquirt-v4/
-# build/expandasquirt-v4.ino.bin is the upload artifact
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi --output-dir build firmware/
+# build/firmware.ino.bin is the upload artifact
 ```
 
 ### 11.5 Build-time configuration
