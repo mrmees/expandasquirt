@@ -119,7 +119,7 @@ void loop() {
 
     // State machine ticks every loop — handles state transitions and runs
     // ArduinoOTA.poll() during MM_OTA_READY / MM_UPLOAD_APPLYING.
-    maintenance_tick(now);
+    maintenance_tick();
 
     unsigned long loop_dur = millis() - loop_start;
     if (loop_dur > 50) {

@@ -37,6 +37,18 @@
 #include <WiFiS3.h>
 #include <ArduinoOTA.h>
 
+// Toggle to 1 to re-enable the [mm] state machine traces during bench debugging.
+// Spec/use: V4X-DESIGN.md §5.3 maintenance state machine.
+#define MM_TRACE 0
+
+#if MM_TRACE
+#define MM_TRACE_PRINT(...) do { Serial.print(__VA_ARGS__); } while (0)
+#define MM_TRACE_PRINTLN(...) do { Serial.println(__VA_ARGS__); } while (0)
+#else
+#define MM_TRACE_PRINT(...) do { } while (0)
+#define MM_TRACE_PRINTLN(...) do { } while (0)
+#endif
+
 namespace {
 
 enum class MMState : uint8_t {
@@ -77,7 +89,9 @@ void enter_armed() {
 }
 
 void enter_wifi_joining() {
+    MM_TRACE_PRINTLN(F("[mm] enter_wifi_joining: calling ble_end()"));
     ble_end();
+    MM_TRACE_PRINTLN(F("[mm] enter_wifi_joining: ble_end done, calling WiFi.begin"));
     WiFi.begin(s_args.ssid, s_args.psk);
 }
 
@@ -94,9 +108,14 @@ void enter_ota_error() {
     WiFi.end();
 }
 
-void to_state(MMState s, uint32_t now) {
+void to_state(MMState s) {
+    uint32_t now = millis();
     s_state = s;
     s_state_entered_ms = now;
+    MM_TRACE_PRINT(F("[mm] -> "));
+    MM_TRACE_PRINT((int)s);
+    MM_TRACE_PRINT(F(" at ms="));
+    MM_TRACE_PRINTLN(now);
     switch (s) {
         case MMState::ARMED:           enter_armed();         break;
         case MMState::BLE_DRAIN:       /* nothing */          break;
@@ -112,15 +131,19 @@ void to_state(MMState s, uint32_t now) {
 }  // namespace
 
 bool maintenance_request_enter(const MaintenanceArgs& args) {
+    MM_TRACE_PRINT(F("[mm] request_enter: state="));
+    MM_TRACE_PRINTLN((int)s_state);
     if (s_state != MMState::NORMAL) return false;
     s_args = args;
-    to_state(MMState::ARMED, millis());
+    to_state(MMState::ARMED);
     return true;
 }
 
 void maintenance_request_abort() {
+    MM_TRACE_PRINT(F("[mm] request_abort: state="));
+    MM_TRACE_PRINTLN((int)s_state);
     if (s_state == MMState::ARMED) {
-        to_state(MMState::ABORTING, millis());
+        to_state(MMState::ABORTING);
     }
     // After BLE drop (BLE_DRAIN onward), abort is silently ignored — caller
     // would have no way to send the BLE command anyway. Recovery is via the
@@ -131,7 +154,8 @@ bool maintenance_is_active() {
     return s_state != MMState::NORMAL;
 }
 
-void maintenance_tick(uint32_t now) {
+void maintenance_tick() {
+    uint32_t now = millis();
     uint32_t elapsed = now - s_state_entered_ms;
 
     switch (s_state) {
@@ -142,19 +166,19 @@ void maintenance_tick(uint32_t now) {
             // 10s hard cap defends against the unlikely case that the 3s
             // transition fails to fire (clock skew, etc.).
             if (elapsed >= 10000) {
-                to_state(MMState::ABORTING, now);
+                to_state(MMState::ABORTING);
             } else if (elapsed >= 3000) {
-                to_state(MMState::BLE_DRAIN, now);
+                to_state(MMState::BLE_DRAIN);
             }
             return;
 
         case MMState::BLE_DRAIN:
-            if (elapsed >= 1000) to_state(MMState::WIFI_JOINING, now);
+            if (elapsed >= 1000) to_state(MMState::WIFI_JOINING);
             return;
 
         case MMState::WIFI_JOINING:
             if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != INADDR_NONE) {
-                to_state(MMState::OTA_READY, now);
+                to_state(MMState::OTA_READY);
             } else if (elapsed >= 30000) {
                 NVIC_SystemReset();   // 30s deadline; reboot to recover
             }
@@ -193,7 +217,7 @@ void maintenance_tick(uint32_t now) {
 
 bool maintenance_request_enter(const MaintenanceArgs&) { return false; }
 void maintenance_request_abort() {}
-void maintenance_tick(uint32_t) {}
+void maintenance_tick() {}
 bool maintenance_is_active() { return false; }
 
 #endif

@@ -20,9 +20,9 @@ bool maintenance_request_enter(const MaintenanceArgs& args);
 // MM_BLE_DRAIN this is a no-op.
 void maintenance_request_abort();
 
-// Per-loop tick — called from main loop with millis(). The state machine's
+// Per-loop tick. The state machine's
 // timeouts depend on this being called at least every ~100 ms.
-void maintenance_tick(uint32_t now_ms);
+void maintenance_tick();
 
 // True if the machine is in any non-NORMAL state. Other phases of the main
 // loop (sensor reads, CAN broadcasts, periodic BLE dumps) gate themselves on
