@@ -45,3 +45,9 @@ app/build/
 *.iml
 .idea/
 .cxx/
+
+# Kotlin compiler scratch (sessions, daemon state)
+.kotlin/
+
+# JVM crash / heap dumps (e.g., java_pid12345.hprof)
+*.hprof
