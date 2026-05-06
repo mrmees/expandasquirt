@@ -14,7 +14,7 @@
 #endif
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.1.0"
 #define FIRMWARE_BUILD   STR(GIT_SHORT_SHA)
 
 // ===== Pin map (per DESIGN.md §2.3) =====
