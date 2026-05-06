@@ -1,7 +1,6 @@
 package works.mees.carduino.ota
 
 import android.content.Context
-import android.net.Network
 import android.net.Uri
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -25,7 +24,6 @@ suspend fun pushOta(
     endpoint: CarduinoEndpoint,
     sketchUri: Uri,
     otaPassword: String,
-    network: Network,
     onProgress: (sent: Long, total: Long) -> Unit,
 ): OtaResult = withContext(Dispatchers.IO) {
     try {
@@ -40,7 +38,6 @@ suspend fun pushOta(
         }
 
         val client = OkHttpClient.Builder()
-            .socketFactory(network.socketFactory)
             .writeTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()

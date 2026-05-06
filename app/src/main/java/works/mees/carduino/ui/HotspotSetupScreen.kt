@@ -1,7 +1,6 @@
 package works.mees.carduino.ui
 
 import android.content.Intent
-import android.net.Network
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -24,8 +23,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,27 +46,18 @@ import works.mees.carduino.persistence.HotspotCreds
 fun HotspotSetupScreen(
     vm: HotspotSetupViewModel,
     onCancel: () -> Unit,
-    onProceed: (HotspotCreds, Network) -> Unit,
+    onProceed: (HotspotCreds) -> Unit,
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val ssid by vm.ssid.collectAsState()
     val password by vm.password.collectAsState()
     val status by vm.status.collectAsState()
-    val hotspotNetwork by vm.hotspotNetwork.collectAsState()
     val hasSaved by vm.hasSaved.collectAsState()
     var passwordVisible by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importQr(ctx, uri)
-    }
-
-    LaunchedEffect(Unit) {
-        vm.startCapturing(ctx)
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { vm.stopCapturing() }
     }
 
     Scaffold(
@@ -166,12 +154,11 @@ fun HotspotSetupScreen(
                     Text("Cancel")
                 }
                 Button(
-                    enabled = ssid.isNotBlank() && password.isNotBlank() && hotspotNetwork != null,
+                    enabled = ssid.isNotBlank() && password.isNotBlank(),
                     onClick = {
-                        val network = hotspotNetwork ?: return@Button
                         scope.launch {
                             val creds = vm.persist()
-                            onProceed(creds, network)
+                            onProceed(creds)
                         }
                     },
                     modifier = Modifier.weight(1f),

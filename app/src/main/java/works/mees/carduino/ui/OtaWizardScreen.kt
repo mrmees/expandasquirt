@@ -54,8 +54,8 @@ fun OtaWizardScreen(
                 otaVm.cancel()
                 onExit()
             },
-            onProceed = { creds, network ->
-                otaVm.onHotspotConfirmed(ctx, creds, network)
+            onProceed = { creds ->
+                otaVm.onHotspotConfirmed(ctx, creds)
             },
         )
         return

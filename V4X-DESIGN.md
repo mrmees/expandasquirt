@@ -47,7 +47,7 @@
 
 The Carduino has two transport modes: **normal** (BLE up, WiFi off, CAN/sensors live) and **maintenance** (BLE down, WiFi STA up, sensors/CAN halted, ArduinoOTA listener active). The transition is one-way during a maintenance event; recovery to normal mode is via reboot. **The transports never run concurrently** — DESIGN.md §6.6 rejected dual-stack BLE+WiFi for normal-mode reasons, and the brief transition window is structured to keep them serial as well.
 
-**IP discovery:** since BLE is down before WiFi is up, the app can't receive the device's DHCP-assigned IP over BLE. Discovery is via **mDNS** (`carduino-v4._arduino._tcp.local`, advertised by the JAndrassy library's default mDNS responder). The Android side uses `NsdManager.discoverServices()` scoped to the phone-hotspot Network. mDNS reachability on the R4's modem firmware is one of the bench-prototype gates (§11).
+**IP discovery:** since BLE is down before WiFi is up, the app can't receive the device's DHCP-assigned IP over BLE. Discovery is via **mDNS** (`carduino-v4._arduino._tcp.local`, advertised by the JAndrassy library's default mDNS responder). The Android side uses `NsdManager.discoverServices()` without Network scoping; multicast propagates out all interfaces by default. mDNS reachability on the R4's modem firmware is one of the bench-prototype gates (§11).
 
 ### 3.2 OTA flow
 
@@ -127,16 +127,16 @@ Used only during the OTA wizard's push step. LOH was rejected because Android 16
 
 1. User taps "Firmware update" and enters the wizard.
 2. User picks a `.bin`; pre-flight checks file size and requires engine-off/stable-power attestation.
-3. Hotspot setup screen collects the phone hotspot credentials. It must show the mandatory warning: **"must be WPA2-Personal — WPA3 / Transition will not work."** User taps **Open Hotspot Settings**; the app deeplinks to `android.settings.TETHER_SETTINGS` so the user can toggle the phone hotspot on. The app polls `ConnectivityManager.getNetworkCapabilities` to detect when hotspot appears before allowing the push to continue.
+3. Hotspot setup screen collects the phone hotspot credentials. It must show the mandatory warning: **"must be WPA2-Personal — WPA3 / Transition will not work."** User taps **Open Hotspot Settings**; the app deeplinks to `android.settings.TETHER_SETTINGS` so the user can toggle the phone hotspot on. The app proceeds when the user confirms non-empty hotspot credentials.
    - First-time path: user enters SSID + password manually, or taps **Import from QR screenshot**.
    - QR import path: Android SAF picker with `image/*`; decode standard Wi-Fi QR payloads of the form `WIFI:S:<ssid>;T:<sec>;P:<pwd>;;` using `com.google.zxing:core:3.5.3`; populate the fields; user confirms before proceeding. Add `implementation("com.google.zxing:core:3.5.3")` in `app/build.gradle.kts` (pure Java, ~200 KB, no Play Services dependency).
    - Repeat path: SSID + password are pre-filled from DataStore. User can edit them or tap **Use saved**. A **Clear saved hotspot** action belongs on the diagnostics screen later; out of scope for this document's screen detail.
-4. App captures the phone hotspot `Network` via `ConnectivityManager.NetworkCallback` filtered by `TRANSPORT_WIFI` + `NET_CAPABILITY_LOCAL_NETWORK`. Bench-verify the exact filter on Pixel 8; if Android does not report the phone's own AP with that capability, use the narrowest fallback heuristic that still lets OkHttp bind sockets and `NsdManager.discoverServices` scope to the hotspot Network.
+4. After the user enables their phone hotspot in system settings and confirms credentials in the wizard, the app proceeds without capturing a `Network` handle. Bench-verified on Pixel 8 / Android 16 r4 (2026-05-05): when the phone acts as a hotspot AP, Android does NOT expose the hotspot interface as a Network in `ConnectivityManager` — only the phone's own WiFi STA Network is visible. The phone's kernel routes packets to the hotspot subnet through the AP interface automatically (specific-subnet route in the routing table), so OkHttp and NsdManager work correctly without explicit Network scoping.
 5. App sends BLE `maintenance ssid=<pct> psk=<pct> pwd=<pct>\n` using the confirmed SSID/password and generated OTA password. Firmware behavior is unchanged.
-6. R4 joins the user-enabled hotspot. App waits ~5s after BLE drop, discovers `carduino-v4._arduino._tcp.local` via `NsdManager.discoverServices("_arduino._tcp.", PROTOCOL_DNS_SD)` scoped to the captured hotspot Network, then pushes the firmware over HTTP as before.
+6. R4 joins the user-enabled hotspot. App waits ~5s after BLE drop, discovers `carduino-v4._arduino._tcp.local` via `NsdManager.discoverServices("_arduino._tcp.", PROTOCOL_DNS_SD)`, then pushes the firmware over HTTP as before.
 7. On terminal success or failure, app prompts: "You can turn the hotspot off now." Android does not expose unprivileged APIs to toggle tethering off programmatically.
 
-The HTTP request must be scoped to the captured phone-hotspot Network. On Android 10+, use that Network's `socketFactory` or `ConnectivityManager.bindProcessToNetwork(hotspotNetwork)` so the OkHttp socket goes through the hotspot path rather than cellular. Verify this works on the Pixel 8 as part of implementation (§11).
+The HTTP request does not need app-level Network scoping. The phone's kernel has the specific hotspot-subnet route through the AP interface, so an ordinary OkHttp request to the discovered Carduino IP routes correctly.
 
 ### 4.5 OTA HTTP push (Kotlin sketch, illustrative)
 
@@ -258,7 +258,6 @@ Pure HTTP `POST /sketch HTTP/1.1` to port 65280. Headers: `Authorization: Basic 
 | Failure | Detection | Recovery |
 |---|---|---|
 | User selected wrong hotspot security mode | Same as wrong-PSK: R4 hits `MM_WIFI_JOINING` 30 sec timeout, then BLE rediscovers without OTA completion | Wizard surfaces "Hotspot security check — must be WPA2-Personal, not WPA3 or Transition. Open hotspot settings and switch." |
-| Phone hotspot Network capture timeout | `ConnectivityManager.NetworkCallback` doesn't fire within 15 sec of user confirming hotspot is on | "Hotspot didn't come up. Verify Wi-Fi/Bluetooth aren't conflicting and retry, or use USB update." |
 | mDNS lookup times out (device on hotspot but not advertising) | `NsdManager.discoverServices` 15 sec timeout without resolving | "Device didn't appear on hotspot. Verify hotspot is up and try again, or use USB update." Possible causes: WiFi join failed silently, mDNS responder not bridged by modem firmware, or phone hotspot client isolation. |
 | WiFi join fails on Carduino (wrong PSK, AP unavailable) | `MM_WIFI_JOINING` 30 sec timeout → reboot | Carduino comes back to `MM_NORMAL` and BLE-advertises. App sees BLE rediscovery without OTA completion → "WiFi join failed, retry." |
 | HTTP push fails before 200 (4xx, network error, write timeout) | OkHttp call returns error or non-200 | Active sketch is intact (no `apply()` ran). User retries. |
@@ -321,8 +320,7 @@ Task 75 (BLE-reconnect timing tune) is gated on the first real OTA cycle produci
 
 - ~~**R4 `WiFiServer` accepts incoming connections on phone hotspot with modem firmware 0.6.0.**~~ ✅ **VERIFIED 2026-05-05** via Phase L Task 53 bench — see `prototypes/ota_arduinoota/README.md`. R4 accepted HTTP POST, applied firmware, rebooted into pushed sketch.
 - **R4 mDNS responder works in STA mode on phone hotspot.** JAndrassy's default `ArduinoOTAMdnsClass` global registers it; depends on `WiFiUDP::beginMulticast` reaching the modem properly. Not directly verified yet — Task 53 bench couldn't browse mDNS post-reboot since the rebooted test-sketch lacks WiFi. Verify during Task 71/72 implementation when the production app does the lookup.
-- **Phone hotspot Network capture works on Pixel 8** — confirm `ConnectivityManager.NetworkCallback` fires for the phone's own hotspot AP and that OkHttp `socketFactory` routes through it.
-- **`NsdManager` resolves `_arduino._tcp` services on phone-hotspot Network specifically.** Android may scope mDNS to a specific Network; verify `discoverServices` works against the captured phone-hotspot `Network`.
+- **`NsdManager` resolves `_arduino._tcp` services on the hotspot subnet** — multicast propagates out all interfaces by default; verified during Task 77 bench.
 - **Bootloader-force procedure on Matthew's R4 clone.** Double-tap reset to enter the BOSSA bootloader is the standard Arduino-OEM procedure; clone behavior may differ. Verify before shipping the USB-rescue screen.
 - **Sketch size after firmware additions.** Estimated ~10 KB, ~13 KB headroom. Verify post-implementation with `arduino-cli compile` size output. If we overflow, candidates to cut: compact debug strings in `self_tests.cpp`, drop the unused `verbose` command, defer the maintenance LED patterns to a v4.y polish pass.
 - **Banner format compatibility.** Adding `version=` line is technically a change to the BLE banner output; existing clients (nRF Connect, etc.) won't care, but worth a quick visual check that `Serial Bluetooth Terminal` still renders cleanly.

@@ -1,7 +1,6 @@
 package works.mees.carduino.ui
 
 import android.content.Context
-import android.net.Network
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -59,9 +58,9 @@ class OtaViewModel(
         _step.value = OtaStep.HotspotSetup(s.uri, s.sizeBytes)
     }
 
-    fun onHotspotConfirmed(ctx: Context, creds: HotspotCreds, network: Network) {
+    fun onHotspotConfirmed(ctx: Context, creds: HotspotCreds) {
         val s = _step.value as? OtaStep.HotspotSetup ?: return
-        startTransfer(ctx, s.uri, creds, network)
+        startTransfer(ctx, s.uri, creds)
     }
 
     fun cancel() {
@@ -87,11 +86,11 @@ class OtaViewModel(
         super.onCleared()
     }
 
-    private fun startTransfer(ctx: Context, uri: Uri, creds: HotspotCreds, network: Network) {
+    private fun startTransfer(ctx: Context, uri: Uri, creds: HotspotCreds) {
         workJob?.cancel()
         workJob = viewModelScope.launch {
             try {
-                runOtaFlow(ctx, uri, creds, network)
+                runOtaFlow(ctx, uri, creds)
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {
@@ -109,7 +108,6 @@ class OtaViewModel(
         ctx: Context,
         uri: Uri,
         creds: HotspotCreds,
-        network: Network,
     ) {
         val otaPassword = generateOtaPassword()
 
@@ -161,7 +159,7 @@ class OtaViewModel(
         delay(5_000)
 
         _step.value = OtaStep.FindingDevice("Looking for carduino-v4 on hotspot")
-        val endpoint = discoverCarduino(ctx, network, "carduino-v4", 15_000)
+        val endpoint = discoverCarduino(ctx, "carduino-v4", 15_000)
         if (endpoint == null) {
             failWithReconnect("Device didn't appear on hotspot within 15 sec", canRetry = true, showUsbRescue = true)
             return
@@ -174,7 +172,6 @@ class OtaViewModel(
                 endpoint = endpoint,
                 sketchUri = uri,
                 otaPassword = otaPassword,
-                network = network,
                 onProgress = { sent, total -> _step.value = OtaStep.Uploading(sent, total) },
             )
         ) {

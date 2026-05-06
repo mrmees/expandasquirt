@@ -1,13 +1,9 @@
 package works.mees.carduino.ota
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.os.Build
 import java.net.InetAddress
-import java.util.concurrent.Executors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -20,13 +16,10 @@ data class CarduinoEndpoint(
 
 suspend fun discoverCarduino(
     ctx: Context,
-    network: Network,
     expectedName: String = "carduino-v4",
     timeoutMillis: Long = 15_000,
 ): CarduinoEndpoint? {
     val nsd = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager
-    val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val executor = Executors.newSingleThreadExecutor()
     val deferred = CompletableDeferred<CarduinoEndpoint>()
     var resolvedAlready = false
 
@@ -73,31 +66,13 @@ suspend fun discoverCarduino(
 
     return try {
         withTimeoutOrNull(timeoutMillis) {
-            if (Build.VERSION.SDK_INT >= 33) {
-                nsd.discoverServices(
-                    CARDUINO_SERVICE_TYPE,
-                    NsdManager.PROTOCOL_DNS_SD,
-                    network,
-                    executor,
-                    discoveryListener,
-                )
-                deferred.await()
-            } else {
-                val previousNetwork = cm.boundNetworkForProcess
-                try {
-                    // FIXME: process-wide; only used on pre-T fallback
-                    cm.bindProcessToNetwork(network)
-                    @Suppress("DEPRECATION")
-                    nsd.discoverServices(
-                        CARDUINO_SERVICE_TYPE,
-                        NsdManager.PROTOCOL_DNS_SD,
-                        discoveryListener,
-                    )
-                    deferred.await()
-                } finally {
-                    cm.bindProcessToNetwork(previousNetwork)
-                }
-            }
+            @Suppress("DEPRECATION")
+            nsd.discoverServices(
+                CARDUINO_SERVICE_TYPE,
+                NsdManager.PROTOCOL_DNS_SD,
+                discoveryListener,
+            )
+            deferred.await()
         }
     } catch (e: CancellationException) {
         throw e
@@ -105,7 +80,6 @@ suspend fun discoverCarduino(
         null
     } finally {
         runCatching { nsd.stopServiceDiscovery(discoveryListener) }
-        executor.shutdown()
     }
 }
 

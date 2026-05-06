@@ -35,6 +35,9 @@ HANDOFF.md
 # Brainstorm/visual companion artifacts (transient session content)
 .superpowers/
 
+# Bench session scratch (screenshots, capture logs, compiled .bin caches)
+.tmp-*
+
 # Android Studio / Gradle
 local.properties
 app/build/
