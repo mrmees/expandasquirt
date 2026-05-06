@@ -1,0 +1,4 @@
+[submodule "libraries/ArduinoBLE"]
+	path = libraries/ArduinoBLE
+	url = https://github.com/mrmees/ArduinoBLE.git
+	branch = bleperi-task0-audit
