@@ -3608,16 +3608,11 @@ git commit -m "decision: OTA path forward documented"
 
 ---
 
-## Phase J: Maintenance Mode Integration (Tasks 41-44) — DEFERRED to v4.x
+## Phase J: Maintenance Mode Integration (Tasks 41-44) — SUPERSEDED by Phases L-P
 
-🛑 **Task 40 (2026-05-04) decided: defer Phase J.** v4 ships with USB-only
-firmware updates. The wireless OTA path will be revisited together with the
-companion Android app — see `DESIGN.md` §6.4.3 for the v4.x roadmap.
+🛑 **The original AP-mode browser-upload approach (Tasks 41-44 below) was abandoned during the v4.x design pass (2026-05-05). The actual v4.x implementation is in Phases L-P. The architecture shifted from "firmware brings up an AP and serves an HTTP form" to "phone brings up its hotspot and pushes a `.bin` to the firmware's JAndrassy/ArduinoOTA listener." Tasks 41-44 are kept verbatim below for historical context but should NOT be executed.**
 
-Tasks 41-44 below are kept for reference but should NOT be executed as part
-of v4. When v4.x picks them up, the AP+upload pattern below will be replaced
-with the JAndrassy/ArduinoOTA listener pattern, so most of the implementation
-detail will need rewriting at that point.
+See `V4X-DESIGN.md` (especially §3.2, §4.4, §11.2) for the design rationale. Phases L-P in this document are the executable plan.
 
 ---
 
@@ -6526,7 +6521,29 @@ git commit -m "feat: SAF file picker + size validation with unit tests"
 
 ---
 
-### Task 71: 🔧 LocalOnlyHotspot lifecycle with Network capture and forced WPA2
+### Task 71: 🔧 Manual hotspot setup + Network capture (Plan C)
+
+✅ **SHIPPED 2026-05-05** in commit `f93ecb3`. Pivoted from the original
+LOH plan when bench-testing on Pixel 8 / Android 16 r4 proved the
+framework discards customConfig for non-system-priority callers
+(see V4X-DESIGN.md §11.2).
+
+**Shipped files:**
+- `app/src/main/java/works/mees/carduino/persistence/DeviceStore.kt` (extended with `HotspotCreds`)
+- `app/src/main/java/works/mees/carduino/ota/HotspotManager.kt`
+- `app/src/main/java/works/mees/carduino/ota/WifiQrParser.kt` + `WifiQrDecoder.kt` (ZXing dep added)
+- `app/src/main/java/works/mees/carduino/ui/HotspotSetupScreen.kt` + `HotspotSetupViewModel.kt`
+- `app/src/test/java/works/mees/carduino/ota/WifiQrParserTest.kt` (10 tests, all green)
+
+**Public API delivered:**
+- `suspend fun awaitHotspotNetwork(ctx, timeoutMillis): Network?` — captures the phone's own hotspot Network via `ConnectivityManager.NetworkCallback` filtered by `TRANSPORT_WIFI + NET_CAPABILITY_LOCAL_NETWORK` (API 33+; pre-T fallback marked with FIXME).
+- `parseWifiQr(payload): WifiQrResult` — pure-logic decoder for `WIFI:S:...;T:...;P:...;;` strings.
+- `decodeQrFromImage(ctx, uri): QrDecodeResult` — image Uri → QR payload via ZXing.
+- `HotspotSetupScreen` — Compose UI: SSID/Password fields, deeplink to TETHER_SETTINGS, QR import, "Use saved" if DataStore has prior creds.
+
+---
+
+**Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ota/LohManager.kt`
@@ -6669,7 +6686,22 @@ git commit -m "feat: LocalOnlyHotspot with WPA2-forced config, Network capture f
 
 ---
 
-### Task 72: 🔧 NsdManager mDNS lookup of `_arduino._tcp` scoped to LOH network
+### Task 72: 🔧 mDNS lookup scoped to captured phone-hotspot Network
+
+✅ **SHIPPED 2026-05-05** in commit `93e9b47`. Reconciled from the original
+LOH-scoped discovery plan to the shipped Plan C flow: discovery is scoped to
+the captured phone-hotspot `Network`.
+
+**Shipped files:**
+- `app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt`
+
+**Public API delivered:**
+- `suspend fun discoverCarduino(ctx, network, expectedName, timeoutMillis): CarduinoEndpoint?` — discovers `_arduino._tcp` and returns `CarduinoEndpoint(host, port, serviceName)`.
+- API 33+ uses the network-overload of `NsdManager.discoverServices`; pre-T uses a `bindProcessToNetwork` fallback.
+
+---
+
+**Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ota/MdnsLookup.kt`
@@ -6769,7 +6801,22 @@ git commit -m "feat: NsdManager mDNS lookup scoped to LOH Network"
 
 ---
 
-### Task 73: HTTP push (OkHttp, Basic auth, network binding)
+### Task 73: HTTP push (OkHttp, Basic auth, phone-hotspot Network binding)
+
+✅ **SHIPPED 2026-05-05** in commit `4e903db`. The pusher targets the
+JAndrassy/ArduinoOTA listener over the captured phone-hotspot `Network`,
+not a firmware-created LOH/AP path.
+
+**Shipped files:**
+- `app/src/main/java/works/mees/carduino/ota/OtaPusher.kt`
+
+**Public API delivered:**
+- `suspend fun pushOta(ctx, endpoint, sketchUri, otaPassword, network, onProgress): OtaResult` — returns `Success`, `HttpError(code, body)`, or `NetworkError(cause)`.
+- OkHttp client is bound through `network.socketFactory` so upload traffic stays on the captured hotspot network.
+
+---
+
+**Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ota/OtaPusher.kt`
@@ -6868,6 +6915,25 @@ git commit -m "feat: OkHttp OTA push with progress + Basic auth + network bindin
 ---
 
 ### Task 74: OTA wizard UI orchestration
+
+✅ **SHIPPED 2026-05-05** in commits `492c2b9` and `aff2997`.
+Commit `492c2b9` delivered the `OtaViewModel` state machine, percent-encoder,
+and 7 unit tests. Commit `aff2997` delivered the wizard UI, navigation wiring,
+and dashboard menu entry.
+
+**Shipped files:**
+- `app/src/main/java/works/mees/carduino/ui/OtaViewModel.kt`
+- `app/src/main/java/works/mees/carduino/ui/OtaWizardScreen.kt`
+- `app/src/main/java/works/mees/carduino/MainActivity.kt` (nav wiring)
+- `app/src/test/java/works/mees/carduino/ui/OtaPercentEncodeTest.kt`
+
+**Public API / UI delivered:**
+- Full OTA state machine spanning `PickFile`, `PreFlight`, `HotspotSetup`, `EnteringMaintenance`, `FindingDevice`, `Uploading`, `Applying`, `Verifying`, `Done`, and `Failed`.
+- `OtaWizardScreen` renders a sub-composable per `OtaStep`.
+
+---
+
+**Original Plan-A spec (superseded — kept for reference):**
 
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ui/OtaWizardScreen.kt`
@@ -7155,6 +7221,10 @@ git commit -m "tune: post-apply verify timing based on bench measurement"
 
 ### Task 76: USB rescue screen
 
+✅ **SHIPPED 2026-05-05** in commit `37c5da2`. Files: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`, plus nav wiring in `MainActivity.kt`, button row in `DiagnosticsScreen.kt`, callback prop on `OtaWizardScreen.kt`.
+
+The bootloader-force procedure on Matthew's specific R4 clone hasn't been bench-verified yet — the screen documents the standard Arduino procedure (double-tap reset → yellow LED pulses → arduino-cli upload). If the clone differs at bench, update the screen's footer note and `docs/bench-test-procedures.md`.
+
 **Files:**
 - Create: `app/src/main/java/works/mees/carduino/ui/UsbRescueScreen.kt`
 - Modify: `docs/bench-test-procedures.md` (add bootloader-force section)
@@ -7307,7 +7377,9 @@ Update the existing deferred-Phase-J intro at line ~3611 of IMPLEMENTATION-PLAN.
 ```markdown
 ## Phase J: Maintenance Mode Integration (Tasks 41-44) — SUPERSEDED by Phases L-P
 
-🛑 **The original AP-mode browser-upload approach (Tasks 41-44 below) was abandoned during the v4.x design pass (2026-05-05). The actual v4.x implementation is in Phases L-P above. Tasks 41-44 are kept for historical context but should NOT be executed.**
+🛑 **The original AP-mode browser-upload approach (Tasks 41-44 below) was abandoned during the v4.x design pass (2026-05-05). The actual v4.x implementation is in Phases L-P. The architecture shifted from "firmware brings up an AP and serves an HTTP form" to "phone brings up its hotspot and pushes a `.bin` to the firmware's JAndrassy/ArduinoOTA listener." Tasks 41-44 are kept verbatim below for historical context but should NOT be executed.**
+
+See `V4X-DESIGN.md` (especially §3.2, §4.4, §11.2) for the design rationale. Phases L-P in this document are the executable plan.
 ```
 
 - [ ] **Step 2: Update DESIGN.md §6.4.3**
@@ -7317,18 +7389,18 @@ Replace the v4.x-roadmap placeholder text with:
 ```markdown
 #### 6.4.3 v4.x companion Android app
 
-Implemented in v4.x. See `V4X-DESIGN.md` for the design and `IMPLEMENTATION-PLAN.md` Phases L-P for the task breakdown.
+Implemented in v4.x. The Android app handles BOTH the live BLE sensor dashboard (replacing terminal apps like nRF Connect for daily use) AND firmware push over WiFi via a manual-hotspot OTA wizard. See `V4X-DESIGN.md` for the design and `IMPLEMENTATION-PLAN.md` Phases L-P for the task breakdown.
 ```
 
 - [ ] **Step 3: Update DESIGN.md §6.5**
 
 Replace each "deferred to v4.x" maintenance LED line with the actual pattern from Task 62:
 
-- "Maintenance entering: slow blink top-left corner"
-- "Wireless update ready: solid top row"
-- "Upload in progress: top row slow chase"
-- "Applying: solid top row + bottom row"   ← (or whatever the final pattern is)
-- "OTA error: solid X across matrix"
+- `MM_ARMED` / `MM_BLE_DRAIN` / `MM_WIFI_JOINING`: slow 1 Hz blink of pixel (col 11, row 0)
+- `MM_OTA_READY`: solid full column 11
+- `MM_UPLOAD_APPLYING`: chase down column 11 at ~10 Hz while upload polling yields
+- `MM_UPLOAD_APPLYING` tail: fast strobe of column 11 at 5 Hz, rarely displayed before reset
+- `MM_OTA_ERROR`: `ERR99` persists until the 5-sec auto-reboot returns to normal boot
 
 - [ ] **Step 4: Commit**
 

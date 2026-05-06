@@ -460,25 +460,9 @@ host-side timeout — but it requires a companion tool on the user's phone or
 laptop (e.g. `arduino-cli` running under Termux on Android) to push the bin.
 That companion tool is the missing piece.
 
-#### 6.4.3 v4.x roadmap: companion Android app
+#### 6.4.3 v4.x companion Android app
 
-Future scope, not part of v4:
-
-- Android companion app that handles BOTH the live BLE sensor console (the
-  primary day-to-day UX, replacing terminal apps like `nRF Connect`) AND
-  acts as the firmware push tool over WiFi when the user enters maintenance
-  mode.
-- Firmware-side: in-firmware maintenance state machine that ends BLE,
-  switches modem to WiFi STA, connects to the user's phone hotspot, brings
-  up the JAndrassy listener, and waits for a push.
-- Apply step is handled inside JAndrassy's `InternalStorageRenesas`
-  abstraction — no external bootloader interaction required.
-- Eliminates the need for any externally-hosted firmware artifact. Updates
-  flow phone → R4 over WiFi, with the BLE side providing the trigger and
-  status display.
-
-Until that app exists, USB updates are sufficient for the development phase
-and any rare in-car update needed in v4.
+Implemented in v4.x. The Android app handles BOTH the live BLE sensor dashboard (replacing terminal apps like nRF Connect for daily use) AND firmware push over WiFi via a manual-hotspot OTA wizard. See `V4X-DESIGN.md` for the design and `IMPLEMENTATION-PLAN.md` Phases L-P for the task breakdown.
 
 ### 6.5 LED matrix (12×8) status display
 
@@ -490,13 +474,15 @@ and any rare in-car update needed in v4.
 - Bottom row: 5 sensor health LEDs (lit = healthy)
 - Total LEDs lit: ~5-7 out of 96 — visually unobtrusive
 
-**Maintenance entering:** deferred to v4.x with wireless OTA (§6.4).
+**Maintenance entering** (`MM_ARMED` / `MM_BLE_DRAIN` / `MM_WIFI_JOINING`): slow 1 Hz blink of pixel (col 11, row 0) — i.e. one corner pixel of the always-visible right strip when the MCP2515 shield is on top. Per `display_matrix.cpp` `draw_countdown()`.
 
-**Wireless update ready:** deferred to v4.x with wireless OTA (§6.4).
+**Wireless update ready** (`MM_OTA_READY`): solid full column 11 (all 8 rows). Per `draw_ap_ready()`.
 
-**Upload in progress:** deferred to v4.x with wireless OTA (§6.4).
+**Upload in progress** (`MM_UPLOAD_APPLYING`): chase down column 11 (single pixel rotates row 0 → 7 at ~10 Hz). Visible only when `ArduinoOTA.poll()` yields between byte-batch reads. Per `draw_uploading()`.
 
-**Applying:** deferred to v4.x with wireless OTA (§6.4).
+**Applying** (`MM_UPLOAD_APPLYING` tail): fast strobe of column 11 at 5 Hz. Rarely actually displayed — the library's `apply()` resets the chip from inside the call. Included for completeness. Per `draw_applying()`.
+
+**OTA error** (`MM_OTA_ERROR`): "ERR99" code persists until the 5-sec auto-reboot cycles back to NORMAL. Same render path as the existing `DISP_ERROR` mode.
 
 **Error states:** "ERR" + 2-digit code, persistent until reboot.
 
